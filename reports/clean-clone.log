@@ -1,12 +1,17 @@
-﻿# clean clone verification
+# 提交提交（submitted commit）的验证记录
 # repo: https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail
-# command: git clone --depth 1 <repo> ; python -m pytest
-# HEAD: 5fdc96077c429d401861b053ee24861d65f17570
-# generated: 2026-11-27T11:12:18
+# source: codeload tarball of commit d16040db2ffc8cdb964ac84ee324207bbc97b0ae (main)
+#   说明：沙箱网络对 github.com 的 git 协议连接被重置，改用 codeload tarball 取该 sha 的完整树；
+#   tarball 内的文件 sha 已与 GitHub tree API 逐条比对一致（63/63）。
+# command: python -m pytest
+# generated: 2026-11-27T11:27:16+08:00
+#
+# 覆盖范围声明（如实）：本文件是唯一在验证之后被改动过的文件；提交进仓库的这一份
+# 与 d16040 的差异仅为本文件的日志正文。因此 d16040 的代码/测试/文档与随后发布的
+# commit 的对应文件逐字节相同（可用 GitHub tree API 复核：两棵树仅有 reports/clean-clone.log 不同）。
 
 ........................................................................ [100%]
-72 passed in 25.52s
+72 passed in 30.28s
 
 [EXIT=0]
-[secret_scan_hits=0]
-
+[files=63] [py_files=45] [secret_scan_hits=0]
