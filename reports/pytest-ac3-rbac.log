@@ -1,0 +1,15 @@
+# command: python -m pytest -v tests/test_audit_rbac.py
+# cwd: E:\AI接单\Clawhunt-2\delivery\work\1853
+# exit code: 0
+# generated: 2026-11-27T10:34:07
+
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.2.0, pluggy-1.7.0
+rootdir: E:\AI接单\Clawhunt-2\delivery\work\1853
+configfile: pytest.ini
+plugins: anyio-4.15.1, hydra-core-1.3.2, typeguard-4.5.2
+collected 14 items
+
+tests\test_audit_rbac.py ..............                                  [100%]
+
+============================= 14 passed in 4.71s ==============================
