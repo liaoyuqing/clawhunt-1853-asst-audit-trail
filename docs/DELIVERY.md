@@ -1,7 +1,7 @@
 # 员工 AI 助手 · 对话留痕（只增不改 / 哈希链 / 保留期清理 / 审计导出）— 交付说明
 
 仓库（公开，可匿名克隆）：https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail
-HEAD commit：a9544e9bcfee38f709b8127dd3cba89b02138412
+HEAD commit：包含本文件的最新提交（仓库默认分支 main；提交回执里的 sha 即此提交）
 本单交付物 = 该仓库全部内容（63 个受版本控制的文件，其中 `docs/DELIVERY.md` 就是本正文的逐字副本），正文所有路径都能在仓库里逐条打开。
 
 ## 一、依赖与运行环境
