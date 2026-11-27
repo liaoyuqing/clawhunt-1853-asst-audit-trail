@@ -41,8 +41,8 @@ S2-AUDIT / S2-IAM 是桩：审计日志落本地 `audit_log` 表（同样装了�
 - `python -m pytest`：**72 passed**，六个测试文件分别为 test_audit_rbac 14 / test_crypto_redaction 13 / test_export 12 / test_hash_chain 13 / test_retention_purge 11 / test_trail_immutable 9；完整日志 `reports/pytest-full.log`，末行 `72 passed in 16.93s`。
 - 每个 AC 单独一份日志（路径逐条核对存在于仓库）：`reports/pytest-ac1-immutable.log`、`reports/pytest-ac2-hash-chain.log`、`reports/pytest-ac3-rbac.log`、`reports/pytest-ac4-retention.log`、`reports/pytest-export.log`、`reports/pytest-crypto-redaction.log`；逐条 AC↔用例↔日志对照表 `reports/ac-mapping.md`。
 - 发布树验证：取已验证提交 d16040 的完整文件树（codeload tarball；63 个文件 blob sha 与 GitHub tree API 逐条一致）解到独立目录后直接 `python -m pytest` → **72 passed in 30.28s，EXIT=0**，45 个 Python 文件，密钥前缀扫描命中 0。其后的提交只动过 `docs/DELIVERY.md` 与本日志两个文件，其余 61 个文件逐字节未变（`reports/clean-clone.log` 正文写明了这条对应关系，可用 GitHub tree API 复核）。
-- 进程级端到端：`python scripts/e2e_evidence.py` 起真实 uvicorn 进程 + 真实 socket/HTTP，跑完 4 条 AC 与导出链路共 26 个请求段落，末行 `EXIT=0`，报告 714 行（`reports/e2e-evidence.md`，含 uvicorn 访问日志）。
-- 代码规模：45 个 Python 文件 / 5485 行（app + tests + migrations + scripts）；README 245 行 / 24279 字节；受版本控制文件 63 个（含 `docs/DELIVERY.md` 正文副本）。
+- 进程级端到端：`python scripts/e2e_evidence.py` 起真实 uvicorn 进程 + 真实 socket/HTTP，跑完 4 条 AC 与导出链路共 26 个请求段落，末行 `EXIT=0`，报告 714 行 / 539 KB（`reports/e2e-evidence.md`，含 uvicorn 访问日志）。
+- 代码规模：45 个 Python 文件 / 5485 行（app + tests + migrations + scripts）；README 245 行 / 24279 字节（10 节）；受版本控制文件 63 个（含 `docs/DELIVERY.md` 正文副本）。
 - 数据规模（端到端场景）：5 类留痕各 1 条起，AC2 同日 5 条建链、AC4 4 条 200 天前数据被清理。
 
 ## 四、提案承诺 → 落地文件（逐条对得上）
@@ -59,7 +59,7 @@ S2-AUDIT / S2-IAM 是桩：审计日志落本地 `audit_log` 表（同样装了�
 | 3 个审计接口 | `app/api/assistant/audit.py`（+ 任务状态与下载两条配套路由） |
 | 异步导出 | `app/services/export.py`（JSONL、HMAC 签名令牌、10 分钟、单次可用；每行含 seq/row_hash） |
 | 测试 | `tests/` 6 文件 72 条 |
-| README / 报告 | `README.md`（10 节）、`reports/`（8 份日志/报告） |
+| README / 报告 | `README.md`（10 节）、`reports/`（10 份日志/报告 + 逐条 AC 对照表） |
 
 提案 ⑤ 的字段口径也逐条落库：工具调用含 `tool_name/tool_version/params_redacted/result_digest/result_summary/confirmed_by/confirmed_at/status`；拦截事件含 `block_reason/rule_id`；反馈含 `rating/comment_redacted`；列表接口支持 `user_id/from/to/tool_name/negative_feedback/blocked` 五维筛选（另有 `page/page_size`，上限 200），并对 `user_id+时间` 建复合索引。提案 ⑥ 的成对边界全部有用例：隐藏 vs 物理删除、第 23 条篡改 vs 未篡改、员工 vs 审计角色、200 天 vs 当天、30 天配置 vs 180 天默认、导出链接第 10 分钟 vs 第 11 分钟。
 
@@ -74,4 +74,15 @@ S2-AUDIT / S2-IAM 是桩：审计日志落本地 `audit_log` 表（同样装了�
 7. 一处设计取舍：清理后历史段只保留段尾哈希与条数（`asst_purge_marker`），因此「清理后的链完整性」证明的是「未删除段未被改」，历史段无法逐条复核；若需逐条永久可复核，需把链记录独立归档到审计日志模块，提案 ⑥「需确认②」已标为待确认项。
 
 ## 六、交付方式
-平台未给交付仓库（github_repo_owner/name 为 null），本单自建公开仓库并以 `github_repo` 资产提交：https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail 。仓库 public，可匿名 `git clone`，已实跑验证。测试与端到端日志、AC 对照表、README 均在仓库内同一路径下可直接打开。
+平台未给交付仓库（github_repo_owner/name 为 null，delivery_workspace_status=none），本单自建公开仓库并以 `github_repo` 资产提交：https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail 。仓库 public（`private=false`，匿名可 clone），已实跑验证。
+
+提交的 assets 均为可在浏览器直接打开的 https 直链：
+
+| kind | 打开后应看到 |
+| --- | --- |
+| `github_repo` | 仓库首页，63 个受版本控制文件 |
+| `report` | `reports/e2e-evidence.md`：进程级端到端 4 条 AC 与导出链路的逐请求记录（714 行） |
+| `report` | `reports/pytest-full.log`：72 passed in 16.93s 的完整 pytest 输出 |
+| `doc` | `README.md`：运行方式、环境变量、S2-AUDIT/S2-IAM 对接点、验证边界 |
+
+平台没有通用文件上传口，因此全部交付物既在仓库里逐文件可读，也把关键结论写进了本正文。
