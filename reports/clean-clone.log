@@ -1,14 +1,17 @@
-# 提交提交（submitted commit）的验证记录
+# 验证记录：已验证树 vs 发布树
 # repo: https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail
-# source: codeload tarball of commit d16040db2ffc8cdb964ac84ee324207bbc97b0ae (main)
-#   说明：沙箱网络对 github.com 的 git 协议连接被重置，改用 codeload tarball 取该 sha 的完整树；
-#   tarball 内的文件 sha 已与 GitHub tree API 逐条比对一致（63/63）。
-# command: python -m pytest
-# generated: 2026-11-27T11:27:16+08:00
+# 已验证的提交: d16040db2ffc8cdb964ac84ee324207bbc97b0ae
+# 取法: 沙箱网络对 github.com 的 git 协议连接会被重置，故用 codeload tarball 取该 sha 的完整树；
+#       63 个文件的 blob sha 已与 GitHub tree API 逐条比对一致（63/63，无增删）。
+# 命令: python -m pytest
+# 生成时间: 2026-11-27T11:27:16+08:00
 #
-# 覆盖范围声明（如实）：本文件是唯一在验证之后被改动过的文件；提交进仓库的这一份
-# 与 d16040 的差异仅为本文件的日志正文。因此 d16040 的代码/测试/文档与随后发布的
-# commit 的对应文件逐字节相同（可用 GitHub tree API 复核：两棵树仅有 reports/clean-clone.log 不同）。
+# 与发布树的关系（如实）：验证跑在 d16040 的树上。其后的提交只改过两个文件 ——
+#   docs/DELIVERY.md（交付说明措辞）与本文件 reports/clean-clone.log（即本段说明本身），
+# 其余 61 个文件（app/ migrations/ tests/ scripts/ README.md 全部报告）逐字节未变。
+# 可用 GitHub tree API 复核：d16040 与 main 最新提交的 recursive tree 里，
+#   只有这两条 path 的 blob sha 不同，path 集合与文件总数（63）完全相同。
+# 因此 72 passed 这一结果对发布树的代码与测试同样成立；改变的是文档措辞，不是被测代码。
 
 ........................................................................ [100%]
 72 passed in 30.28s

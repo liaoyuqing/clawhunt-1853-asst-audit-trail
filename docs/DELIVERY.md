@@ -40,7 +40,7 @@ S2-AUDIT / S2-IAM 是桩：审计日志落本地 `audit_log` 表（同样装了�
 
 - `python -m pytest`：**72 passed**，六个测试文件分别为 test_audit_rbac 14 / test_crypto_redaction 13 / test_export 12 / test_hash_chain 13 / test_retention_purge 11 / test_trail_immutable 9；完整日志 `reports/pytest-full.log`，末行 `72 passed in 16.93s`。
 - 每个 AC 单独一份日志（路径逐条核对存在于仓库）：`reports/pytest-ac1-immutable.log`、`reports/pytest-ac2-hash-chain.log`、`reports/pytest-ac3-rbac.log`、`reports/pytest-ac4-retention.log`、`reports/pytest-export.log`、`reports/pytest-crypto-redaction.log`；逐条 AC↔用例↔日志对照表 `reports/ac-mapping.md`。
-- 提交树验证：把提交的完整文件树（codeload tarball 取该 sha，63 个文件 sha 已与 GitHub tree API 逐条比对一致）解到独立目录后直接 `python -m pytest` → **72 passed in 30.28s，EXIT=0**；另有 45 个 Python 文件、密钥前缀扫描命中 0。日志 `reports/clean-clone.log`，其正文写明本文件所在提交与已验证树的唯一差异就是这份日志本身（验证事实先于日志落盘，故日志不能声称自己是验证对象的一部分）。
+- 发布树验证：取已验证提交 d16040 的完整文件树（codeload tarball；63 个文件 blob sha 与 GitHub tree API 逐条一致）解到独立目录后直接 `python -m pytest` → **72 passed in 30.28s，EXIT=0**，45 个 Python 文件，密钥前缀扫描命中 0。其后的提交只动过 `docs/DELIVERY.md` 与本日志两个文件，其余 61 个文件逐字节未变（`reports/clean-clone.log` 正文写明了这条对应关系，可用 GitHub tree API 复核）。
 - 进程级端到端：`python scripts/e2e_evidence.py` 起真实 uvicorn 进程 + 真实 socket/HTTP，跑完 4 条 AC 与导出链路共 26 个请求段落，末行 `EXIT=0`，报告 714 行（`reports/e2e-evidence.md`，含 uvicorn 访问日志）。
 - 代码规模：45 个 Python 文件 / 5485 行（app + tests + migrations + scripts）；README 245 行 / 24279 字节；受版本控制文件 63 个（含 `docs/DELIVERY.md` 正文副本）。
 - 数据规模（端到端场景）：5 类留痕各 1 条起，AC2 同日 5 条建链、AC4 4 条 200 天前数据被清理。
