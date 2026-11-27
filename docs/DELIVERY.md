@@ -2,7 +2,7 @@
 
 仓库（公开，可匿名克隆）：https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail
 HEAD commit：包含本文件的最新提交（仓库默认分支 main；提交回执里的 sha 即此提交）
-本单交付物 = 该仓库全部内容（63 个受版本控制的文件，其中 `docs/DELIVERY.md` 就是本正文的逐字副本），正文所有路径都能在仓库里逐条打开。
+本单交付物 = 该仓库全部内容（63 个受版本控制的文件，其中 `docs/DELIVERY.md` 即本交付说明的仓库副本，仅 HEAD 行随提交更新），正文所有路径都能在仓库里逐条打开。
 
 ## 一、依赖与运行环境
 
