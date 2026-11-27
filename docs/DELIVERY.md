@@ -15,7 +15,7 @@ export ASST_TRAIL_KEY=$(python -c "import base64,os;print(base64.b64encode(os.ur
 alembic upgrade head && uvicorn app.main:app --port 8000     # 打开 http://127.0.0.1:8000/docs 即全部接口
 ```
 跑测试：`python -m pytest`（末行应为 `72 passed`）。
-环境变量清单见 README 第 4 节：ASST_TRAIL_KEY（必填）、ASST_DATABASE_URL、ASST_LOG_RETENTION_DAYS（默认 180）、ASST_PURGE_BATCH_SIZE、ASST_EXPORT_DIR、ASST_EXPORT_URL_TTL_SECONDS（默认 600 秒）、ASST_EXPORT_MAX_ROWS、ASST_EXPORT_QUEUE、ASST_EXPORT_SIGNING_KEY、ASST_PUBLIC_BASE_URL、ASST_IAM_STUB_TOKENS。配置与密钥只从环境变量读，仓库内无任何真实密钥（A.3 第 3 条已 `git grep` 扫过 cph_/gho_/ghp_/AKIA，命中 0）。
+环境变量清单见 README 第 4 节：ASST_TRAIL_KEY（必填）、ASST_DATABASE_URL、ASST_LOG_RETENTION_DAYS（默认 180）、ASST_PURGE_BATCH_SIZE、ASST_EXPORT_DIR、ASST_EXPORT_URL_TTL_SECONDS（默认 600 秒）、ASST_EXPORT_MAX_ROWS、ASST_EXPORT_QUEUE、ASST_EXPORT_SIGNING_KEY、ASST_PUBLIC_BASE_URL、ASST_IAM_STUB_TOKENS。配置与密钥只从环境变量读，仓库内无任何真实密钥（已对全仓库 git grep 扫描常见密钥前缀，命中 0 条）。
 
 S2-AUDIT / S2-IAM 是桩：审计日志落本地 `audit_log` 表（同样装了只增不改触发器），身份用 `ASST_IAM_STUB_TOKENS` 令牌→(operator, org, roles, sites) 映射。真实替换点只有三个函数，README 第 5 节给了字段对照表：`app/services/audit_log.py::write_audit_log`、`app/services/iam.py::StubIamClient.resolve_principal`、`app/api/deps.py::get_iam`。
 
