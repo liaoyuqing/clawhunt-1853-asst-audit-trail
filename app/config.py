@@ -8,6 +8,8 @@ DEFAULT_RETENTION_DAYS = 180
 DEFAULT_EXPORT_TTL_SECONDS = 600
 DEFAULT_PURGE_BATCH_SIZE = 1000
 DEFAULT_EXPORT_MAX_ROWS = 100000
+DEFAULT_REDIS_KEY_PREFIX = "asst1853:"
+DEFAULT_REDIS_BRPOP_TIMEOUT = 5
 
 
 class ConfigError(RuntimeError):
@@ -44,6 +46,9 @@ class Settings:
     export_url_ttl_seconds: int
     export_max_rows: int
     export_queue: str
+    redis_url: str | None = None
+    redis_key_prefix: str = DEFAULT_REDIS_KEY_PREFIX
+    redis_brpop_timeout: int = DEFAULT_REDIS_BRPOP_TIMEOUT
 
     @property
     def sqlalchemy_url(self) -> str:
@@ -61,8 +66,11 @@ def load_settings() -> Settings:
     database_url = _raw("ASST_DATABASE_URL") or "sqlite+pysqlite:///./var/asst.db"
     public_base_url = (_raw("ASST_PUBLIC_BASE_URL") or "http://127.0.0.1:8000").rstrip("/")
     export_queue = (_raw("ASST_EXPORT_QUEUE") or "thread").lower()
-    if export_queue not in {"inline", "thread"}:
-        raise ConfigError("ASST_EXPORT_QUEUE 只支持 inline / thread")
+    if export_queue not in {"inline", "thread", "redis"}:
+        raise ConfigError("ASST_EXPORT_QUEUE 只支持 inline / thread / redis")
+    redis_url = _raw("ASST_REDIS_URL")
+    if export_queue == "redis" and not redis_url:
+        raise ConfigError("ASST_EXPORT_QUEUE=redis 时必须给出 ASST_REDIS_URL")
     return Settings(
         database_url=database_url,
         trail_key=_raw("ASST_TRAIL_KEY"),
@@ -74,4 +82,7 @@ def load_settings() -> Settings:
         export_url_ttl_seconds=_int("ASST_EXPORT_URL_TTL_SECONDS", DEFAULT_EXPORT_TTL_SECONDS),
         export_max_rows=_int("ASST_EXPORT_MAX_ROWS", DEFAULT_EXPORT_MAX_ROWS),
         export_queue=export_queue,
+        redis_url=redis_url,
+        redis_key_prefix=_raw("ASST_REDIS_KEY_PREFIX") or DEFAULT_REDIS_KEY_PREFIX,
+        redis_brpop_timeout=_int("ASST_REDIS_BRPOP_TIMEOUT", DEFAULT_REDIS_BRPOP_TIMEOUT),
     )

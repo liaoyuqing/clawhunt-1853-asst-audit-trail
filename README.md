@@ -2,7 +2,7 @@
 
 会员空间平台 Stage v「员工 AI 助手入口」的留痕与审计后端。实现需求 ①②③④ 与全部 4 条验收标准。
 
-- 技术栈：Python 3.11 / FastAPI / SQLAlchemy 2 / Alembic / PostgreSQL 16（生产）/ SQLite（本地与测试）/ Redis（导出队列的预留位）
+- 技术栈：Python 3.11 / FastAPI / SQLAlchemy 2 / Alembic / PostgreSQL 15+（生产，实测 15.19）/ SQLite（离线与测试）/ Redis（导出队列，实测 7.2.14）
 - 依赖模块：S2-AUDIT（审计日志）、S2-IAM（身份、角色与数据范围）——本仓库自带桩，对接点见「5. 依赖对接点」
 - 只用虚构测试数据；仓库内无任何真实个人信息、企业信息或客户名称；所有密钥只从环境变量读
 
@@ -37,15 +37,25 @@ python -m uvicorn app.main:app --reload --port 8000
 ### 跑测试
 
 ```bash
-python -m pytest -q                 # 全量：72 passed
+python -m pytest -q                 # 离线全量：72 passed, 13 skipped
 python -m pytest tests/test_trail_immutable.py -v   # AC1
 python -m pytest tests/test_hash_chain.py -v        # AC2
 python -m pytest tests/test_audit_rbac.py -v        # AC3
 python -m pytest tests/test_retention_purge.py -v   # AC4
 ```
 
-测试不需要外部 PostgreSQL、Redis 或任何网络：数据库用临时文件 SQLite，导出队列用 `inline` 同步跑。
-批次结果与逐条明细见 `reports/pytest-full.log`、`reports/ac-mapping.md`。
+默认不连任何外部中间件：数据库用临时文件 SQLite，导出队列用 `inline` 同步跑，13 条 PG / Redis 专项用例自动 skip。
+把下面两个环境变量指向真实中间件，同一份测试会改跑真实 PostgreSQL / 真实 Redis（用例之间各自建独立 schema，绝不碰库里的 `public`）：
+
+```bash
+export ASST_TEST_DATABASE_URL='postgresql+psycopg://<user>:<password>@<host>:<port>/<db>'
+export ASST_TEST_REDIS_URL='redis://:<password>@<host>:<port>/<db>'
+python -m pytest -q                 # 全量 85 条：接真 PG 为 82 passed + 3 skipped（Redis 用例需再给 ASST_TEST_REDIS_URL）
+```
+
+批次结果与逐条明细见 `reports/ac-mapping.md`；真机验证的原始输出见
+`reports/pytest-sqlite.log`（离线基线）、`reports/pytest-pg.log`（接真 PG）、
+`reports/pg-migration.log`、`reports/pg-immutability.log`、`reports/redis-queue-e2e.log`。
 
 ---
 
@@ -110,16 +120,22 @@ python -m pytest tests/test_retention_purge.py -v   # AC4
 | 变量 | 必填 | 默认 | 说明 |
 | --- | --- | --- | --- |
 | `ASST_TRAIL_KEY` | **是** | 无 | 留痕原文加密密钥。32 字节 base64 / 64 位 hex / 任意口令（走 HKDF-SHA256 派生）。**缺失时拒绝写入，绝不退化成明文** |
-| `ASST_DATABASE_URL` | 否 | `sqlite+pysqlite:///./var/asst.db` | 生产填 `postgresql+psycopg://user@host:5432/db` |
+| `ASST_DATABASE_URL` | 否 | `sqlite+pysqlite:///./var/asst.db` | 生产填 `postgresql+psycopg://<user>:<password>@<host>:<port>/<db>`（PostgreSQL 15+）。**口令含 `#` `@` `/` 等保留字符时必须百分号编码**；带 `options=-c search_path=...` 时整串写进 `alembic`/应用环境变量即可 |
+| `ASST_DB_POOL_SIZE` | 否 | `10` | 非 SQLite 时的连接池大小（溢出上限 5） |
 | `ASST_LOG_RETENTION_DAYS` | 否 | `180` | 留痕保留期（天）。<=0 会被拒绝 |
 | `ASST_PURGE_BATCH_SIZE` | 否 | `1000` | 每次清理的批量行数（避免长事务） |
 | `ASST_EXPORT_DIR` | 否 | `./var/exports` | 导出 JSONL 落盘目录 |
 | `ASST_EXPORT_URL_TTL_SECONDS` | 否 | `600` | 下载链接有效期（需求写死 10 分钟） |
 | `ASST_EXPORT_MAX_ROWS` | 否 | `100000` | 单文件行数上限 |
-| `ASST_EXPORT_QUEUE` | 否 | `thread` | `inline`（同步，测试用）/ `thread`（进程内线程） |
+| `ASST_EXPORT_QUEUE` | 否 | `thread` | `inline`（同步，测试用）/ `thread`（进程内线程）/ `redis`（跨进程真实队列，需同时给 `ASST_REDIS_URL`） |
+| `ASST_REDIS_URL` | 队列=redis 时必填 | 无 | `redis://:<password>@<host>:<port>/<db>`；只在 `ASST_EXPORT_QUEUE=redis` 时使用 |
+| `ASST_REDIS_KEY_PREFIX` | 否 | `asst1853:` | 队列键前缀（队列键 = 前缀 + `export:queue`，在处理集合 = 前缀 + `export:processing`），便于与同实例其它业务隔离与清理 |
+| `ASST_REDIS_BRPOP_TIMEOUT` | 否 | `5` | worker 的 `BRPOP` 阻塞超时（秒） |
 | `ASST_EXPORT_SIGNING_KEY` | 否 | 由 `ASST_TRAIL_KEY` 派生 | 下载链接 HMAC 签名密钥 |
 | `ASST_PUBLIC_BASE_URL` | 否 | `http://127.0.0.1:8000` | 下载链接里的对外基址 |
 | `ASST_IAM_STUB_TOKENS` | 否 | 空 | S2-IAM 桩的令牌映射（仅本地联调；格式见下） |
+| `ASST_TEST_DATABASE_URL` | 否 | 空 | **仅测试用**。给出时 pytest 全部用例改跑该真实 PostgreSQL（每用例独立 schema，用完 DROP SCHEMA CASCADE）；不给则用临时 SQLite |
+| `ASST_TEST_REDIS_URL` | 否 | 空 | **仅测试用**。给出时 `tests/test_redis_queue.py` 才连真实 Redis；不给则整组 skip |
 
 `ASST_IAM_STUB_TOKENS` 格式（只放虚构身份）：
 
@@ -254,21 +270,28 @@ row_hash = sha256(prev_hash || canonical_json(payload))
 
 ---
 
-## 8. 验证边界（如实说明：哪些在本机跑不了、用什么替代）
+## 8. 验证边界（如实说明：哪些已实测、哪些仍需在集成环境复核）
 
-本仓库的自动化测试全部在 **SQLite** 上跑通（72 条），**没有在本机连上真实 PostgreSQL 16**（本机无 PG 实例、无 Docker）。因此下面这些差异必须在集成环境复核：
+本轮已在本机用**真实中间件**跑过验证，结果与证据见 `docs/CLOUD_VERIFICATION.md` 与 `reports/`：
 
-| 项 | 测试用的 SQLite | 生产 PG16 | 影响与补救 |
+- 真实 **PostgreSQL 15.19**（不是 16）：`alembic upgrade head` 在一次性 schema 里建 11 表 + 3 触发器全成功，`alembic current` 为 `0001_initial (head)`；plpgsql 触发器对 `UPDATE` / `DELETE` 的拦截、对 `hidden_by_user` / `purged_at` 两个白名单列的放行均实测通过。证据 `reports/pg-migration.log`、`reports/pg-immutability.log`。
+- 全量 pytest 接真 PG：`82 passed, 3 skipped`（证据 `reports/pytest-pg.log`）；被跳过的 3 条是 Redis 队列用例，单独接真 Redis 跑为 `3 passed`（证据 `reports/pytest-redis.log`）。
+- 真实 **Redis 7.2.14**（db5 + requirepass）：导出任务走队列，API 只入队返回 202、独立 worker 进程 `BRPOP` 消费、文件落盘、`asst_export_job` 置 `finished`，端到端一次通过。证据 `reports/redis-queue-e2e.log`。
+- 无中间件的离线基线仍是 `72 passed, 13 skipped`（证据 `reports/pytest-sqlite.log`）。
+
+下表逐条列出仍存在的差异与尚未覆盖的点：
+
+| 项 | 已实测 | 仍存在/未覆盖 | 影响与补救 |
 | --- | --- | --- | --- |
-| 不可变触发器实现 | 列清单版 `BEFORE UPDATE OF <cols>` + `RAISE(ABORT)` | plpgsql `BEFORE UPDATE OR DELETE` + `to_jsonb(OLD) - 白名单` 差集 + `RAISE EXCEPTION ... ERRCODE P0001` | 两套 DDL 都写在 `app/db/immutability.py`，Alembic 迁移按方言分支；PG 版靠 `IS DISTINCT FROM` 判差集，语义等价但**未在真实 PG16 上执行过**，CI 首跑请确认 `CREATE OR REPLACE FUNCTION` 与触发器创建成功 |
-| 并发 | 单连接串行；`AsstTrailCounter` 用 `UPDATE ... RETURNING` 自增 | 多连接并发 | SQLite 下并发退化为文件锁；PG 下 `UPDATE ... RETURNING` 是行级原子操作。**高并发下 seq 连续性未做压测** |
-| JSON 列 | `TEXT` 存 JSON，`json_set()` 用于模拟篡改 | `jsonb` | PG 上 payload 是 `jsonb`，键序被归一；`canonical_json` 已排序所以哈希口径不受影响，但**PG 上未实测哈希一致性** |
-| UUID | 存 32 位 hex 文本 | 原生 `uuid` | 参数绑定与索引行为不同，未在 PG 上压测 |
-| 导出队列 | `inline` 同步执行 + `thread` 线程模式 | 建议 Redis 队列（`requirements.txt` 的 `redis` 预留） | 多副本部署时 `thread` 模式的任务只在单进程内跑，需换成共享队列；当前**没有交付 Redis 队列实现** |
-| 导出存储 | 本地磁盘 `ASST_EXPORT_DIR` | 对象存储（MinIO/S3） | `app/services/export.py::export_dir()` 是唯一落盘点，替换成对象存储只需改这一处 |
-| S2-AUDIT / S2-IAM | 本仓库桩（`audit_log` 表 + 环境变量令牌映射） | 真实模块 | 对接点见第 5 节；桩的行为（403 码、字段名）按需求文字实现，**未与真实 S2 模块联调** |
-| 定时任务 | 直接 `python -m app.workers.*` | cron / Airflow | 入口脚本已备，**未在调度系统里注册** |
-| 加密密钥管理 | 环境变量明文注入 | 建议 KMS / Vault | 按需求「配置与密钥只从环境变量读取」实现；KMS 集成不在本单范围（提案 ⑦ 已写明不含） |
+| 不可变触发器实现 | SQLite 列清单版 `BEFORE UPDATE OF <cols>` + `RAISE(ABORT)`；PostgreSQL 15.19 plpgsql `BEFORE UPDATE OR DELETE` + `to_jsonb(OLD) - 白名单` 差集 + `RAISE EXCEPTION ... ERRCODE P0001` | 未在 16 上跑过（15 与 16 的 plpgsql/触发器语义无差异，但报告只声称 15.19） | 两套 DDL 都在 `app/db/immutability.py`，Alembic 迁移按方言分支；PG 版本断言只要求 >= 15 |
+| 并发 | 单连接串行；`AsstTrailCounter` 用 `UPDATE ... RETURNING` 自增（PG 上实测） | 多连接并发压测未做 | PG 下 `UPDATE ... RETURNING` 是行级原子操作；高并发下 seq 连续性未压测 |
+| JSON 列 | PG `jsonb` 上跑通了写入、解密读取与哈希链校验（`tests/test_pg_dialect.py::test_row_hash_formula_on_pg`、`test_tamper_detected_on_pg`） | — | `canonical_json` 排序保证键序归一不影响哈希口径 |
+| UUID | PG 原生 `uuid` 上跑通了写入、按 id 查询与 JSON 往返（`test_uuid_and_json_roundtrip_on_pg`） | 大表索引性能未压测 | 参数绑定由 SQLAlchemy `Uuid` 类型处理 |
+| 导出队列 | `inline` 同步执行、`thread` 线程模式、`redis` 队列模式（裸 Redis list，`app/services/export_queue.py` + `app/workers/export_worker.py`） | 未接 RQ/Celery，也未做多 worker 并行压测 | 队列语义是 `LPUSH` + `BRPOP`，天然支持多 worker；重复入队按 job 状态幂等 |
+| 导出存储 | 本地磁盘 `ASST_EXPORT_DIR` | 对象存储（MinIO/S3）未接 | `app/services/export.py::export_dir()` 是唯一落盘点，替换成对象存储只需改这一处 |
+| S2-AUDIT / S2-IAM | 本仓库桩（`audit_log` 表 + 环境变量令牌映射） | 未与真实 S2 模块联调 | 对接点见第 5 节；桩的行为（403 码、字段名）按需求文字实现 |
+| 定时任务 | 入口脚本 `python -m app.workers.retention_purge` / `python -m app.workers.hash_chain` / `python -m app.workers.export_worker` 可直接跑 | 未在 cron / Airflow 里注册 | 运维侧只需把这三个入口挂上调度 |
+| 加密密钥管理 | 环境变量明文注入（`ASST_TRAIL_KEY`） | KMS / Vault 未接 | 按需求「配置与密钥只从环境变量读取」实现，KMS 不在本单范围（提案 ⑦ 已写明不含） |
 
 **明确没有做的**（与提案 ⑦「不含」一致）：助手对话功能本身、审计工作台前端、SIEM/外部日志平台对接、KMS 集成、历史数据迁移。
 
@@ -287,7 +310,7 @@ app/
   core/canonical.py               确定性 JSON（哈希链输入）
   db/base.py                      声明基类与业务表通用列
   db/session.py                   引擎 / 会话工厂 / 建表
-  db/immutability.py              只增不改触发器（PG16 + SQLite 两套 DDL）
+  db/immutability.py              只增不改触发器（PostgreSQL 15+ 与 SQLite 两套 DDL）
   models/asst_trail.py            留痕模型（含 purge_marker / 计数器）
   models/asst_hash_chain.py       链记录与链执行记录
   models/asst_export_job.py       导出任务与下载令牌

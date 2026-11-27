@@ -126,7 +126,9 @@ def _postgres_trail_ddl() -> list[str]:
     return [
         _PG_TRAIL_FN,
         "DROP TRIGGER IF EXISTS trg_asst_trail_immutable ON asst_trail",
-        "CREATE TRIGGER trg_asst_trail_immutable BEFORE UPDATE OR DELETE ON asst_trail",
+        # CREATE TRIGGER 必须是**一条**完整语句：拆成两段会得到
+        # 「syntax error at end of input ... ON asst_trail」
+        "CREATE TRIGGER trg_asst_trail_immutable BEFORE UPDATE OR DELETE ON asst_trail "
         "FOR EACH ROW EXECUTE FUNCTION asst_trail_immutable_fn()",
     ]
 
@@ -138,7 +140,7 @@ END;
 $$ LANGUAGE plpgsql"""
 
 
-_PG_PURGEABLE_APPEND_ONLY_FN = """CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger AS $
+_PG_PURGEABLE_APPEND_ONLY_FN = """CREATE OR REPLACE FUNCTION {fn}() RETURNS trigger AS $$
 DECLARE
     guard_ok boolean;
 BEGIN
@@ -152,7 +154,7 @@ BEGIN
     END IF;
     RAISE EXCEPTION 'TRAIL_IMMUTABLE: {table} is append-only' USING ERRCODE = 'P0001';
 END;
-$ LANGUAGE plpgsql"""
+$$ LANGUAGE plpgsql"""
 
 
 def _postgres_append_only_ddl(table: str, purgeable: bool = False) -> list[str]:
@@ -164,7 +166,7 @@ def _postgres_append_only_ddl(table: str, purgeable: bool = False) -> list[str]:
     return [
         body,
         f"DROP TRIGGER IF EXISTS trg_{table}_append_only ON {table}",
-        f"CREATE TRIGGER trg_{table}_append_only BEFORE UPDATE OR DELETE ON {table}",
+        f"CREATE TRIGGER trg_{table}_append_only BEFORE UPDATE OR DELETE ON {table} "
         f"FOR EACH ROW EXECUTE FUNCTION {fn}()",
     ]
 

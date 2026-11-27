@@ -1,6 +1,8 @@
 """AC1：用户删除会话后，审计接口仍能查到该会话完整内容。
 
 另外覆盖提案承诺的「只增不改」硬约束：DB 触发器拒绝改密文/改判据、原文不落明文。
+所有直连 SQL 都走 tests/conftest.py 的方言无关辅助函数，因此同一组用例在
+SQLite 与真实 PostgreSQL 上都能跑（PG 上布尔列类型校验由数据库本身兜底）。
 """
 from __future__ import annotations
 
@@ -8,17 +10,30 @@ import hashlib
 import uuid
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select
 
+from app.models.asst_trail import AsstTrail
 from tests.conftest import (
     AUDITOR_TOKEN,
     EMPLOYEE_TOKEN,
     auth,
+    bulk_delete_trails,
+    count_rows,
     create_conversation,
     post_answer,
     post_message,
+    post_tool_call,
     seed_full_conversation,
+    set_hidden_by_user,
+    set_hidden_by_user_raw,
+    update_trail_ciphertext,
 )
+
+
+def _trail_count(ctx, conversation_id: str) -> int:
+    return count_rows(
+        ctx, AsstTrail, AsstTrail.__table__.c.conversation_id == uuid.UUID(conversation_id)
+    )
 
 
 def test_hidden_but_queryable(ctx):
@@ -65,11 +80,7 @@ def test_hidden_but_queryable(ctx):
 def test_delete_does_not_remove_rows(ctx):
     """删除会话后留痕行数不变（不是软删留痕，是根本没删）。"""
     conversation_id = seed_full_conversation(ctx)
-    with ctx.session() as session:
-        before = session.execute(
-            text("SELECT count(*) FROM asst_trail WHERE conversation_id = :cid"),
-            {"cid": conversation_id.replace("-", "")},
-        ).scalar_one()
+    before = _trail_count(ctx, conversation_id)
     assert before == 5
 
     assert (
@@ -79,23 +90,14 @@ def test_delete_does_not_remove_rows(ctx):
         == 204
     )
 
-    with ctx.session() as session:
-        after = session.execute(
-            text("SELECT count(*) FROM asst_trail WHERE conversation_id = :cid"),
-            {"cid": conversation_id.replace("-", "")},
-        ).scalar_one()
-    assert after == before
+    assert _trail_count(ctx, conversation_id) == before
 
 
 def test_db_trigger_blocks_update(ctx):
     """直接 UPDATE 留痕内容 → DB 抛 TRAIL_IMMUTABLE（应用层之外的第二道闸）。"""
     conversation_id = seed_full_conversation(ctx)
     with pytest.raises(Exception) as excinfo:
-        with ctx.engine.begin() as conn:
-            conn.execute(
-                text("UPDATE asst_trail SET content_redacted = 'tampered' WHERE conversation_id = :cid"),
-                {"cid": conversation_id.replace("-", "")},
-            )
+        update_trail_ciphertext(ctx, conversation_id)
     assert "TRAIL_IMMUTABLE" in str(excinfo.value)
 
 
@@ -103,26 +105,32 @@ def test_db_trigger_blocks_delete_without_purge_window(ctx):
     """没有清理窗口时 DELETE 一律被拒。"""
     seed_full_conversation(ctx)
     with pytest.raises(Exception) as excinfo:
-        with ctx.engine.begin() as conn:
-            conn.execute(text("DELETE FROM asst_trail"))
+        bulk_delete_trails(ctx)
     assert "TRAIL_IMMUTABLE" in str(excinfo.value)
 
 
 def test_hidden_flag_only_whitelist(ctx):
-    """白名单两列可改；其它列一律拒（含试图把 hidden_by_user 改成非布尔）。"""
+    """白名单两列可改；其它列一律拒。
+
+    非布尔取值这一条：SQLite 里列类型宽松，靠触发器里的 typeof 校验拦住；
+    PostgreSQL 的 boolean 列本身不接受非布尔值，类型层就会报错。两种方言都拒绝，错误文案不同。
+    """
     conversation_id = seed_full_conversation(ctx)
+    set_hidden_by_user(ctx, conversation_id, True)  # 白名单列：改得动
     with ctx.engine.begin() as conn:
-        conn.execute(
-            text("UPDATE asst_trail SET hidden_by_user = 1 WHERE conversation_id = :cid"),
-            {"cid": conversation_id.replace("-", "")},
-        )
-    with pytest.raises(Exception) as excinfo:
-        with ctx.engine.begin() as conn:
-            conn.execute(
-                text("UPDATE asst_trail SET hidden_by_user = 7 WHERE conversation_id = :cid"),
-                {"cid": conversation_id.replace("-", "")},
+        values = conn.execute(
+            select(AsstTrail.__table__.c.hidden_by_user).where(
+                AsstTrail.__table__.c.conversation_id == uuid.UUID(conversation_id)
             )
-    assert "TRAIL_IMMUTABLE" in str(excinfo.value)
+        ).scalars().all()
+    assert values and all(values)
+
+    # 非布尔取值：SQLite 列类型宽松，靠触发器 typeof 校验拦住；
+    # PostgreSQL 的 boolean 列在类型层就拒绝。两条路都是「写不进去」。
+    with pytest.raises(Exception) as excinfo:
+        set_hidden_by_user_raw(ctx, conversation_id, 7)
+    message = str(excinfo.value)
+    assert "TRAIL_IMMUTABLE" in message or "boolean" in message.lower()
 
 
 def test_encrypted_at_rest(ctx):
@@ -132,8 +140,9 @@ def test_encrypted_at_rest(ctx):
     post_message(ctx, conversation_id, secret)
     with ctx.session() as session:
         row = session.execute(
-            text("SELECT content_enc, content_redacted FROM asst_trail WHERE conversation_id = :cid"),
-            {"cid": conversation_id.replace("-", "")},
+            select(AsstTrail.content_enc, AsstTrail.content_redacted).where(
+                AsstTrail.conversation_id == uuid.UUID(conversation_id)
+            )
         ).one()
     assert row[0].startswith("enc:v1:")
     assert secret not in row[0]
@@ -163,10 +172,9 @@ def test_unknown_conversation_404(ctx):
     )
     assert response.status_code == 404
 
+
 def test_tool_call_keeps_result_digest(ctx):
     """提案 ⑤ 字段清单：工具调用留痕含 result_digest（结果摘要的 sha256，可离线核对）。"""
-    from tests.conftest import post_tool_call
-
     conversation_id = create_conversation(ctx, title="工具调用字段")
     post_tool_call(ctx, conversation_id, tool_name="crm.member.lookup")
     response = ctx.client.get(

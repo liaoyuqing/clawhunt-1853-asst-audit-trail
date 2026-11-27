@@ -2,6 +2,7 @@
 
 覆盖：默认 180 天、环境变量改保留期、分批删除、隐藏行同样到期清理、清理后链校验不误报、
 清理窗口关闭后 DELETE 恢复全拒、dry-run 只统计不删。
+所有直连 SQL 都走 tests/conftest.py 的方言无关辅助函数（PG 上布尔/UUID 按列类型绑定）。
 """
 from __future__ import annotations
 
@@ -9,10 +10,12 @@ import uuid
 from datetime import date, datetime, timedelta
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import func, select, text
 
 from app.config import DEFAULT_RETENTION_DAYS
 from app.db.base import utcnow
+from app.models.asst_hash_chain import AsstHashChainEntry
+from app.models.asst_trail import AsstPurgeMarker, AsstTrail
 from app.services.audit_log import ACTION_PURGE, query_audit_log
 from app.services.hash_chain import build_chain, verify_chain
 from app.services.retention import compute_cutoff, purge_all_orgs, run_purge
@@ -21,9 +24,9 @@ from tests.conftest import (
     EMPLOYEE_TOKEN,
     ORG_ID,
     auth,
+    bulk_delete_trails,
+    count_rows,
     create_conversation,
-    post_message,
-    seed_full_conversation,
 )
 
 
@@ -38,8 +41,7 @@ def _post_dated_messages(ctx, conversation_id: str, count: int, occurred_at: str
 
 
 def _count_trails(ctx) -> int:
-    with ctx.session() as session:
-        return session.execute(text("SELECT count(*) FROM asst_trail")).scalar_one()
+    return count_rows(ctx, AsstTrail)
 
 
 def test_default_retention_days_env(ctx, monkeypatch):
@@ -72,11 +74,7 @@ def test_purge_deletes_expired_and_keeps_recent(ctx):
     assert summary.range_from.date() == old_day
 
     assert _count_trails(ctx) == 10
-    with ctx.session() as session:
-        remaining_old = session.execute(
-            text("SELECT count(*) FROM asst_trail WHERE occurred_at < :cutoff"),
-            {"cutoff": summary.cutoff},
-        ).scalar_one()
+    remaining_old = count_rows(ctx, AsstTrail, AsstTrail.__table__.c.occurred_at < summary.cutoff)
     assert remaining_old == 0
 
     with ctx.session() as session:
@@ -132,10 +130,7 @@ def test_hidden_rows_are_purged_too(ctx):
         ).status_code
         == 204
     )
-    with ctx.session() as session:
-        hidden = session.execute(
-            text("SELECT count(*) FROM asst_trail WHERE hidden_by_user = 1")
-        ).scalar_one()
+    hidden = count_rows(ctx, AsstTrail, AsstTrail.__table__.c.hidden_by_user.is_(True))
     assert hidden == 6
 
     with ctx.session() as session:
@@ -169,8 +164,8 @@ def test_chain_survives_purge(ctx):
         session.commit()
     assert summary.deleted_rows == 4
 
+    markers = count_rows(ctx, AsstPurgeMarker)
     with ctx.session() as session:
-        markers = session.execute(text("SELECT count(*) FROM asst_purge_marker")).scalar_one()
         after = verify_chain(session, org_id=ORG_ID, chain_date=recent_day)
         session.commit()
     assert markers == 1
@@ -187,8 +182,7 @@ def test_purge_window_closes_after_run(ctx):
         run_purge(session, org_id=ORG_ID, now=now)
         session.commit()
     with pytest.raises(Exception) as excinfo:
-        with ctx.engine.begin() as conn:
-            conn.execute(text("DELETE FROM asst_trail"))
+        bulk_delete_trails(ctx)
     assert "TRAIL_IMMUTABLE" in str(excinfo.value)
 
 

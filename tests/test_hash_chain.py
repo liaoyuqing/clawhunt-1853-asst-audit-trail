@@ -2,6 +2,9 @@
 
 覆盖：断点检测（first_break_seq + expected/actual）、链尾写审计日志、同日重跑幂等、
 断点后仍可追加、payload 未改但链记录被改也能报出、清理段不误报。
+
+篡改模拟走 tests/conftest.py 的辅助函数（ORM 列类型 + 卸护栏），
+因此同一组用例在 SQLite 与真实 PostgreSQL 上都能执行。
 """
 from __future__ import annotations
 
@@ -9,10 +12,10 @@ import uuid
 from datetime import date, timedelta
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.services.crypto import sha256_hex
-from app.db.immutability import drop_immutability, install_immutability
+from app.db.immutability import install_immutability
 from app.services.hash_chain import (
     GENESIS_PREV_HASH,
     build_chain,
@@ -22,7 +25,15 @@ from app.services.hash_chain import (
     verify_chain,
 )
 from app.services.audit_log import ACTION_HASH_CHAIN, query_audit_log
-from tests.conftest import EMPLOYEE_TOKEN, ORG_ID, create_conversation, post_message
+from tests.conftest import (
+    EMPLOYEE_TOKEN,
+    ORG_ID,
+    create_conversation,
+    delete_trail_row,
+    post_message,
+    tamper_chain_payload_canonical,
+    tamper_trail_payload,
+)
 
 
 def _seed(ctx, count: int, *, day: date, conversation_id: str | None = None) -> str:
@@ -40,6 +51,13 @@ def _seed(ctx, count: int, *, day: date, conversation_id: str | None = None) -> 
         assert response.status_code == 201, response.text
     return conversation_id
 
+
+def _chain_entry_count(ctx) -> int:
+    from app.models.asst_hash_chain import AsstHashChainEntry
+
+    from tests.conftest import count_rows
+
+    return count_rows(ctx, AsstHashChainEntry)
 
 def test_chain_builds_and_verifies_clean(ctx):
     """未篡改：链建成、逻辑自洽、链尾写进审计日志。"""
@@ -83,14 +101,7 @@ def test_tamper_detected(ctx):
     assert built.ok and built.rows == 50
 
     # 模拟「数据库超级用户绕过触发器」：卸掉护栏 → 改 payload → 装回去
-    with ctx.engine.begin() as conn:
-        drop_immutability(conn)
-        conn.execute(
-            text(
-                "UPDATE asst_trail SET payload = json_set(payload, '$.content_redacted', 'TAMPERED') "
-                "WHERE seq = 23"
-            )
-        )
+    tamper_trail_payload(ctx, 23)
     install_immutability(ctx.engine)
 
     with ctx.session() as session:
@@ -112,14 +123,7 @@ def test_tamper_reported_by_http_verify_endpoint(ctx):
         build_chain(session, org_id=ORG_ID, chain_date=day)
         session.commit()
 
-    with ctx.engine.begin() as conn:
-        drop_immutability(conn)
-        conn.execute(
-            text(
-                "UPDATE asst_trail SET payload = json_set(payload, '$.content_redacted', 'TAMPERED') "
-                "WHERE seq = 3"
-            )
-        )
+    tamper_trail_payload(ctx, 3)
     install_immutability(ctx.engine)
 
     response = ctx.client.post(
@@ -160,7 +164,7 @@ def test_rerun_idempotent(ctx):
         tail_first = first.chain_tail_hash
         second = build_chain(session, org_id=ORG_ID, chain_date=day)
         session.commit()
-        count = session.execute(text("SELECT count(*) FROM asst_hash_chain")).scalar_one()
+        count = _chain_entry_count(ctx)
         runs = session.execute(text("SELECT count(*) FROM asst_hash_chain_run")).scalar_one()
     assert count == 10
     assert runs == 1
@@ -176,14 +180,7 @@ def test_rerun_after_tamper_does_not_whiten(ctx):
         build_chain(session, org_id=ORG_ID, chain_date=day)
         session.commit()
 
-    with ctx.engine.begin() as conn:
-        drop_immutability(conn)
-        conn.execute(
-            text(
-                "UPDATE asst_trail SET payload = json_set(payload, '$.content_redacted', 'TAMPERED') "
-                "WHERE seq = 2"
-            )
-        )
+    tamper_trail_payload(ctx, 2)
     install_immutability(ctx.engine)
 
     _seed(ctx, 1, day=day, conversation_id=conversation_id)
@@ -204,11 +201,7 @@ def test_append_after_break(ctx):
     with ctx.session() as session:
         build_chain(session, org_id=ORG_ID, chain_date=day)
         session.commit()
-    with ctx.engine.begin() as conn:
-        drop_immutability(conn)
-        conn.execute(
-            text("UPDATE asst_trail SET payload = json_set(payload, '$.content_redacted', 'X') WHERE seq = 1")
-        )
+    tamper_trail_payload(ctx, 1, value="X")
     install_immutability(ctx.engine)
     _seed(ctx, 2, day=day, conversation_id=conversation_id)
     with ctx.session() as session:
@@ -225,11 +218,7 @@ def test_chain_entry_tamper_detected(ctx):
     with ctx.session() as session:
         build_chain(session, org_id=ORG_ID, chain_date=day)
         session.commit()
-    with ctx.engine.begin() as conn:
-        conn.execute(text("DROP TRIGGER IF EXISTS trg_asst_hash_chain_no_update"))
-        conn.execute(
-            text("UPDATE asst_hash_chain SET payload_canonical = '{}' WHERE seq = 4")
-        )
+    tamper_chain_payload_canonical(ctx, 4)
     install_immutability(ctx.engine)
     with ctx.session() as session:
         result = verify_chain(session, org_id=ORG_ID, chain_date=day)
@@ -246,9 +235,7 @@ def test_missing_trail_without_marker_detected(ctx):
     with ctx.session() as session:
         build_chain(session, org_id=ORG_ID, chain_date=day)
         session.commit()
-    with ctx.engine.begin() as conn:
-        drop_immutability(conn)
-        conn.execute(text("DELETE FROM asst_trail WHERE seq = 2"))
+    delete_trail_row(ctx, 2)
     install_immutability(ctx.engine)
     with ctx.session() as session:
         result = verify_chain(session, org_id=ORG_ID, chain_date=day)

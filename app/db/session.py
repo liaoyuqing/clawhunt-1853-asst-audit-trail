@@ -1,4 +1,4 @@
-"""引擎与会话工厂。生产 PostgreSQL 16，测试/离线用 SQLite（行为差异见 README）。"""
+"""引擎与会话工厂。生产 PostgreSQL 15+，测试/离线用 SQLite（行为差异见 README）。"""
 from __future__ import annotations
 
 import os

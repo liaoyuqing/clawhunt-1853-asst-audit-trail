@@ -160,7 +160,7 @@ def main() -> int:
         f"- 生成时间：{time.strftime('%Y-%m-%dT%H:%M:%S%z')}\n"
         f"- 启动命令：`python -m uvicorn app.main:app --host 127.0.0.1 --port {port}`\n"
         "- 建表方式：`python -m alembic upgrade head`\n"
-        "- 数据库：SQLite 临时文件（本机无 PostgreSQL 16 实例，差异见 README 第 8 节）\n"
+        "- 数据库：临时 SQLite（本脚本只做单机端到端取证；连接真实 PostgreSQL 15.19 / 真实 Redis 的验证见 reports/pg-migration.log、reports/pg-immutability.log、reports/pytest-pg.log、reports/redis-queue-e2e.log）\n"
         "- 身份来源：S2-IAM 桩（`ASST_IAM_STUB_TOKENS` 映射到虚构 UUID）\n"
     )
 

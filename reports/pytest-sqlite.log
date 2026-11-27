@@ -1,0 +1,43 @@
+# pytest 运行日志：sqlite-baseline
+
+- 日期：2026-11-27
+- 解释器：Python 3.11.9 (Windows)
+- 命令：python -m pytest -v
+- 环境：未设置任何中间件环境变量：临时 SQLite + inline 队列（离线基线）
+- 退出码：0
+
+```
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.2.0, pluggy-1.7.0
+rootdir: E:\AI接单\Clawhunt-2\delivery\work\1853
+configfile: pytest.ini
+testpaths: tests
+plugins: cov-7.1.0, anyio-4.15.1, hydra-core-1.3.2, typeguard-4.5.2
+collected 85 items
+
+tests\test_audit_rbac.py ..............                                  [ 16%]
+tests\test_crypto_redaction.py .............                             [ 31%]
+tests\test_export.py ............                                        [ 45%]
+tests\test_hash_chain.py .............                                   [ 61%]
+tests\test_pg_dialect.py ssssssssss                                      [ 72%]
+tests\test_redis_queue.py sss                                            [ 76%]
+tests\test_retention_purge.py ...........                                [ 89%]
+tests\test_trail_immutable.py .........                                  [100%]
+
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_pg_dialect.py:46: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:58: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:73: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:89: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:97: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:104: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:113: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:139: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:158: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_pg_dialect.py:172: 需要 ASST_TEST_DATABASE_URL 指向真实 PostgreSQL
+SKIPPED [1] tests\test_redis_queue.py:52: 需要 ASST_TEST_REDIS_URL 指向真实 Redis
+SKIPPED [1] tests\test_redis_queue.py:114: 需要 ASST_TEST_REDIS_URL 指向真实 Redis
+SKIPPED [1] tests\test_redis_queue.py:138: 需要 ASST_TEST_REDIS_URL 指向真实 Redis
+======================= 72 passed, 13 skipped in 12.73s =======================
+
+```

@@ -1,0 +1,85 @@
+# PostgreSQL 真机迁移与只增不改实证（已脱敏）
+
+- 日期：2026-11-27
+- 连接串：postgresql+psycopg://<user>:<password>@<host>:<port>/<db>?options=-c search_path=<scratch_schema>
+- 一次性 schema：asst_pgverify_e1a2ebb39e（连实例上的既有测试库，用完 DROP SCHEMA CASCADE，不动 public）
+
+## 1. alembic upgrade head
+
+```
+$ python -m alembic upgrade head        # ASST_DATABASE_URL 指向空 schema asst_pgverify_e1a2ebb39e
+
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_initial, 初始结构：留痕、链、清理标记、导出任务、审计日志 + 只增不改触发器。
+exit code = 0
+```
+
+## 2. alembic current
+
+```
+$ python -m alembic current
+0001_initial (head)
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+exit code = 0
+```
+
+## 3. 建表与触发器清单（查 pg_tables / pg_trigger）
+
+- 表（11 张）：alembic_version, asst_conversation, asst_export_job, asst_export_token, asst_hash_chain, asst_hash_chain_run, asst_purge_guard, asst_purge_marker, asst_trail, asst_trail_counter, audit_log
+- 触发器（3 个）：
+  - trg_asst_hash_chain_append_only ON asst_hash_chain
+  - trg_asst_trail_immutable ON asst_trail
+  - trg_audit_log_append_only ON audit_log
+- alembic_version：[('0001_initial',)]
+
+## 4. 只增不改触发器实证
+
+### 4.1 篡改 payload（UPDATE 非白名单列）—— 应被 plpgsql 触发器 RAISE
+
+```sql
+UPDATE asst_trail SET payload = '{"content_redacted": "tampered"}'::jsonb WHERE seq = 900001;
+```
+
+```
+psycopg.errors.RaiseException: TRAIL_IMMUTABLE: asst_trail is append-only; only hidden_by_user/purged_at may change
+完整异常：RaiseException: TRAIL_IMMUTABLE: asst_trail is append-only; only hidden_by_user/purged_at may change
+```
+
+### 4.2 物理删除（purge 窗口未开）—— 应被 RAISE
+
+```sql
+DELETE FROM asst_trail WHERE seq = 900001;
+```
+
+```
+psycopg.errors.RaiseException: TRAIL_IMMUTABLE: physical delete is reserved for the retention purge window
+完整异常：RaiseException: TRAIL_IMMUTABLE: physical delete is reserved for the retention purge window
+```
+
+### 4.3 白名单列 hidden_by_user / purged_at —— 应允许更新
+
+```sql
+UPDATE asst_trail SET hidden_by_user = TRUE WHERE seq = 900001;
+UPDATE asst_trail SET purged_at = now() WHERE seq = 900001;
+SELECT hidden_by_user, purged_at IS NOT NULL AS purged FROM asst_trail WHERE seq = 900001;
+```
+
+```
+结果：hidden_by_user = True，purged_at 已置 = True —— 白名单两列更新成功
+```
+
+### 4.4 错误布尔值（UPDATE hidden_by_user = 7）—— PG boolean 类型层直接拒绝
+
+```sql
+UPDATE asst_trail SET hidden_by_user = 7 WHERE seq = 900001;
+```
+
+```
+DatatypeMismatch: 字段 "hidden_by_user" 的类型为 boolean, 但表达式的类型为 integer
+```
+
+## 5. 清理
+
+DROP SCHEMA "asst_pgverify_e1a2ebb39e" CASCADE 已执行；残留同名 schema 计数 = 0

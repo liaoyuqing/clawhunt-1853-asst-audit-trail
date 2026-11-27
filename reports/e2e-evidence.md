@@ -1,9 +1,9 @@
 # 端到端取证（真实 uvicorn 进程 + 真实 HTTP）
 
-- 生成时间：2026-11-27T10:55:47+0800
-- 启动命令：`python -m uvicorn app.main:app --host 127.0.0.1 --port 53660`
+- 生成时间：2026-11-27T15:30:31+0800
+- 启动命令：`python -m uvicorn app.main:app --host 127.0.0.1 --port 60480`
 - 建表方式：`python -m alembic upgrade head`
-- 数据库：SQLite 临时文件（本机无 PostgreSQL 16 实例，差异见 README 第 8 节）
+- 数据库：临时 SQLite（本脚本只做单机端到端取证；连接真实 PostgreSQL 15.19 / 真实 Redis 的验证见 reports/pg-migration.log、reports/pg-immutability.log、reports/pytest-pg.log、reports/redis-queue-e2e.log）
 - 身份来源：S2-IAM 桩（`ASST_IAM_STUB_TOKENS` 映射到虚构 UUID）
 
 
@@ -32,21 +32,21 @@
 
 ```json
 {
-  "id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
-  "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
+  "id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
+  "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
   "title": "E2E 虚构会话"
 }
 ```
 
 ### 1-2 写用户消息（原文加密 + 脱敏文本）
 
-- 请求：`POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages`
+- 请求：`POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages`
 - 状态码：**201**（期望 201，OK）
 - 响应：
 
 ```json
 {
-  "id": "2487d725-4b1a-4cf2-9634-4f5dd18f41c9",
+  "id": "510f219e-7e89-40fd-8431-80c9fcfc46ad",
   "seq": 1,
   "kind": "message",
   "content_sha256": "16960afbd29000fb23a21702c5c3688aec5efffa20cf7423579ec8b738f55fe9"
@@ -55,13 +55,13 @@
 
 ### 1-3 写回答（引用 doc_id 与版本、模型名、提示词版本）
 
-- 请求：`POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/answers`
+- 请求：`POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/answers`
 - 状态码：**201**（期望 201，OK）
 - 响应：
 
 ```json
 {
-  "id": "b1b0389a-9b53-4b28-8225-550a693d7704",
+  "id": "44dbf861-b9e8-44b3-bdc4-3fa8670a527a",
   "seq": 2,
   "kind": "answer",
   "content_sha256": "45c5074aa2ce69fbe5a722e4e1fc5ba0fd86e3a93d90a75a04af2d9471adbdcd"
@@ -70,13 +70,13 @@
 
 ### 1-4 写工具调用（脱敏参数 + 结果摘要 + 确认人与时间）
 
-- 请求：`POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/tool-calls`
+- 请求：`POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/tool-calls`
 - 状态码：**201**（期望 201，OK）
 - 响应：
 
 ```json
 {
-  "id": "ad762083-781a-4331-b3d0-88976bb4017d",
+  "id": "0a44274a-1d50-4f76-9115-3b445c580ad4",
   "seq": 3,
   "kind": "tool_call",
   "content_sha256": null
@@ -85,13 +85,13 @@
 
 ### 1-5 写关停开关拦截事件
 
-- 请求：`POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/blocked-events`
+- 请求：`POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/blocked-events`
 - 状态码：**201**（期望 201，OK）
 - 响应：
 
 ```json
 {
-  "id": "038cf738-eb54-4586-9aa6-156d2f6f0d87",
+  "id": "b2134c4b-2fdd-43a3-867a-ea400100771b",
   "seq": 4,
   "kind": "blocked_event",
   "content_sha256": null
@@ -100,13 +100,13 @@
 
 ### 1-6 写用户反馈（差评）
 
-- 请求：`POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/feedback`
+- 请求：`POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/feedback`
 - 状态码：**201**（期望 201，OK）
 - 响应：
 
 ```json
 {
-  "id": "5a640d1e-b888-4f7d-824a-638a24b63cf2",
+  "id": "031ac4c4-3cab-42a0-9713-7c8e1a96e27a",
   "seq": 5,
   "kind": "feedback",
   "content_sha256": null
@@ -115,27 +115,27 @@
 
 ### 1-7 删除前：审计详情
 
-- 请求：`GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772`
+- 请求：`GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905`
 - 状态码：**200**（期望 200，OK）
 - 响应：
 
 ```json
 {
-  "id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
-  "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
+  "id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
+  "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
   "title": "E2E 虚构会话",
   "hidden_by_user": false,
   "deleted_at": null,
-  "created_at": "2026-11-27T02:55:49.755342",
+  "created_at": "2026-11-27T07:30:33.555797",
   "trail_count": 5,
   "trails": [
     {
-      "id": "2487d725-4b1a-4cf2-9634-4f5dd18f41c9",
+      "id": "510f219e-7e89-40fd-8431-80c9fcfc46ad",
       "seq": 1,
       "kind": "message",
-      "occurred_at": "2026-11-27T02:55:49.772657",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.568302",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": false,
       "content": "帮我查会员 13812345678 的对接进度",
       "content_redacted": "帮我查会员 138****5678 的对接进度",
@@ -157,12 +157,12 @@
       "comment_redacted": null
     },
     {
-      "id": "b1b0389a-9b53-4b28-8225-550a693d7704",
+      "id": "44dbf861-b9e8-44b3-bdc4-3fa8670a527a",
       "seq": 2,
       "kind": "answer",
-      "occurred_at": "2026-11-27T02:55:49.796764",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.582994",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": false,
       "content": "按虚构制度 v3 第 4 条，该会员可对接。",
       "content_redacted": "按虚构制度 v3 第 4 条，该会员可对接。",
@@ -190,12 +190,12 @@
       "comment_redacted": null
     },
     {
-      "id": "ad762083-781a-4331-b3d0-88976bb4017d",
+      "id": "0a44274a-1d50-4f76-9115-3b445c580ad4",
       "seq": 3,
       "kind": "tool_call",
-      "occurred_at": "2026-11-27T02:55:49.812289",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.596847",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": false,
       "content": null,
       "content_redacted": null,
@@ -206,7 +206,7 @@
 
 ### 1-8 界面「删除会话」（只置 hidden_by_user，204）
 
-- 请求：`DELETE /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772`
+- 请求：`DELETE /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905`
 - 状态码：**204**（期望 204，OK）
 - 响应：
 
@@ -216,27 +216,27 @@
 
 ### 1-9 删除后：审计详情仍 200，条数不变，内容解密后完整
 
-- 请求：`GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772`
+- 请求：`GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905`
 - 状态码：**200**（期望 200，OK）
 - 响应：
 
 ```json
 {
-  "id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
-  "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
+  "id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
+  "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
   "title": "E2E 虚构会话",
   "hidden_by_user": true,
-  "deleted_at": "2026-11-27T02:55:49.896479",
-  "created_at": "2026-11-27T02:55:49.755342",
+  "deleted_at": "2026-11-27T07:30:33.638584",
+  "created_at": "2026-11-27T07:30:33.555797",
   "trail_count": 5,
   "trails": [
     {
-      "id": "2487d725-4b1a-4cf2-9634-4f5dd18f41c9",
+      "id": "510f219e-7e89-40fd-8431-80c9fcfc46ad",
       "seq": 1,
       "kind": "message",
-      "occurred_at": "2026-11-27T02:55:49.772657",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.568302",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": true,
       "content": "帮我查会员 13812345678 的对接进度",
       "content_redacted": "帮我查会员 138****5678 的对接进度",
@@ -258,12 +258,12 @@
       "comment_redacted": null
     },
     {
-      "id": "b1b0389a-9b53-4b28-8225-550a693d7704",
+      "id": "44dbf861-b9e8-44b3-bdc4-3fa8670a527a",
       "seq": 2,
       "kind": "answer",
-      "occurred_at": "2026-11-27T02:55:49.796764",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.582994",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": true,
       "content": "按虚构制度 v3 第 4 条，该会员可对接。",
       "content_redacted": "按虚构制度 v3 第 4 条，该会员可对接。",
@@ -291,12 +291,12 @@
       "comment_redacted": null
     },
     {
-      "id": "ad762083-781a-4331-b3d0-88976bb4017d",
+      "id": "0a44274a-1d50-4f76-9115-3b445c580ad4",
       "seq": 3,
       "kind": "tool_call",
-      "occurred_at": "2026-11-27T02:55:49.812289",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.596847",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": true,
       "content": null,
       "content_redacted": null,
@@ -318,7 +318,7 @@
 
 ```json
 {
-  "org_id": "e4b9e0be-3bc0-4e7b-ae75-a6f1068781e6",
+  "org_id": "580728f5-9675-455b-bc40-55cbce52be18",
   "chain_date": "2026-11-24",
   "rows": 5,
   "ok": true,
@@ -327,8 +327,8 @@
   "break_reason": null,
   "expected_hash": null,
   "actual_hash": null,
-  "chain_head": "c71a08a075d3f0afb98e6704e38e1ed0a66e49d395a3fa772f5971efb2d4be17",
-  "chain_tail_hash": "ef439a4467272be9dc63b0bd4d7dab4e06a431ffe5eb94edc3f44d0323d32edf",
+  "chain_head": "ae69f744e48a7996a5cd4516f1744650f7aef60d6424288116a8d6f4ca540864",
+  "chain_tail_hash": "2de30c9ec7e95077d3e808e6d3e80699c0657ad53e26673d3029be4d6737bbf9",
   "checked_rows": 5,
   "skipped_purged_rows": 0,
   "message": ""
@@ -343,7 +343,7 @@
 
 ```json
 {
-  "org_id": "e4b9e0be-3bc0-4e7b-ae75-a6f1068781e6",
+  "org_id": "580728f5-9675-455b-bc40-55cbce52be18",
   "chain_date": "2026-11-24",
   "rows": 5,
   "ok": true,
@@ -352,8 +352,8 @@
   "break_reason": null,
   "expected_hash": null,
   "actual_hash": null,
-  "chain_head": "c71a08a075d3f0afb98e6704e38e1ed0a66e49d395a3fa772f5971efb2d4be17",
-  "chain_tail_hash": "ef439a4467272be9dc63b0bd4d7dab4e06a431ffe5eb94edc3f44d0323d32edf",
+  "chain_head": "ae69f744e48a7996a5cd4516f1744650f7aef60d6424288116a8d6f4ca540864",
+  "chain_tail_hash": "2de30c9ec7e95077d3e808e6d3e80699c0657ad53e26673d3029be4d6737bbf9",
   "checked_rows": 5,
   "skipped_purged_rows": 0,
   "message": "链完整：5 条已复核，跳过 0 条已清理行"
@@ -371,17 +371,17 @@
 
 ```json
 {
-  "org_id": "e4b9e0be-3bc0-4e7b-ae75-a6f1068781e6",
+  "org_id": "580728f5-9675-455b-bc40-55cbce52be18",
   "chain_date": "2026-11-24",
   "rows": 5,
   "ok": false,
   "status": "broken",
   "first_break_seq": 3,
   "break_reason": "payload_changed",
-  "expected_hash": "9a4f909b05cfd419f219379937231f14626ab386d5832833682185fc5ddf25d2",
-  "actual_hash": "f284a34f4224c11beaf3824e0585b421b1899e222953876a079a6c9215dbd013",
-  "chain_head": "c71a08a075d3f0afb98e6704e38e1ed0a66e49d395a3fa772f5971efb2d4be17",
-  "chain_tail_hash": "ef439a4467272be9dc63b0bd4d7dab4e06a431ffe5eb94edc3f44d0323d32edf",
+  "expected_hash": "69e9afe579edc1e48dee2099d350f1697357abc325c834512ff8c098ccf23789",
+  "actual_hash": "34f74748d2d76440c361aecfa370e9e098cf3ee6ff95c28f62af268abffc887b",
+  "chain_head": "ae69f744e48a7996a5cd4516f1744650f7aef60d6424288116a8d6f4ca540864",
+  "chain_tail_hash": "2de30c9ec7e95077d3e808e6d3e80699c0657ad53e26673d3029be4d6737bbf9",
   "checked_rows": 2,
   "skipped_purged_rows": 0,
   "message": "链在第 3 条断裂（payload_changed）"
@@ -414,7 +414,7 @@
 
 ### 3-2 员工角色查审计详情（期望 403）
 
-- 请求：`GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772`
+- 请求：`GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905`
 - 状态码：**403**（期望 403，OK）
 - 响应：
 
@@ -488,15 +488,15 @@
 {
   "items": [
     {
-      "id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
+      "id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
       "title": "E2E 虚构会话",
       "hidden_by_user": true,
-      "deleted_at": "2026-11-27T02:55:49.896479",
-      "created_at": "2026-11-27T02:55:49.755342",
+      "deleted_at": "2026-11-27T07:30:33.638584",
+      "created_at": "2026-11-27T07:30:33.555797",
       "trail_count": 10,
       "first_occurred_at": "2026-11-24T10:00:00",
-      "last_occurred_at": "2026-11-27T02:55:49.842391",
+      "last_occurred_at": "2026-11-27T07:30:33.617101",
       "tool_names": [
         "crm.member.lookup"
       ],
@@ -521,15 +521,15 @@
 {
   "items": [
     {
-      "id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
+      "id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
       "title": "E2E 虚构会话",
       "hidden_by_user": true,
-      "deleted_at": "2026-11-27T02:55:49.896479",
-      "created_at": "2026-11-27T02:55:49.755342",
+      "deleted_at": "2026-11-27T07:30:33.638584",
+      "created_at": "2026-11-27T07:30:33.555797",
       "trail_count": 10,
       "first_occurred_at": "2026-11-24T10:00:00",
-      "last_occurred_at": "2026-11-27T02:55:49.842391",
+      "last_occurred_at": "2026-11-27T07:30:33.617101",
       "tool_names": [
         "crm.member.lookup"
       ],
@@ -554,15 +554,15 @@
 {
   "items": [
     {
-      "id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
+      "id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
       "title": "E2E 虚构会话",
       "hidden_by_user": true,
-      "deleted_at": "2026-11-27T02:55:49.896479",
-      "created_at": "2026-11-27T02:55:49.755342",
+      "deleted_at": "2026-11-27T07:30:33.638584",
+      "created_at": "2026-11-27T07:30:33.555797",
       "trail_count": 10,
       "first_occurred_at": "2026-11-24T10:00:00",
-      "last_occurred_at": "2026-11-27T02:55:49.842391",
+      "last_occurred_at": "2026-11-27T07:30:33.617101",
       "tool_names": [
         "crm.member.lookup"
       ],
@@ -582,7 +582,7 @@
 
 ### 3-7 跨 org 的审计角色查本 org 会话（期望 404，防枚举）
 
-- 请求：`GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772`
+- 请求：`GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905`
 - 状态码：**404**（期望 404，OK）
 - 响应：
 
@@ -606,42 +606,42 @@
 
 ```json
 {
-  "org_id": "e4b9e0be-3bc0-4e7b-ae75-a6f1068781e6",
+  "org_id": "580728f5-9675-455b-bc40-55cbce52be18",
   "retention_days": 180,
-  "cutoff": "2026-05-31T02:55:50.263206",
+  "cutoff": "2026-05-31T07:30:33.823034",
   "deleted_rows": 4,
   "deleted_chain_entries": 0,
   "batches": 1,
   "range_from": "2026-05-11T09:00:00",
   "range_to": "2026-05-11T09:03:00",
-  "chain_tail_hash": "794e05e134edbeb627b505f81efd156305ce86d82ada6ff54d9f4270bcc8a5f6",
-  "audit_log_id": "5f2a0d31-2ba8-4558-a9f2-bd1c27abc9f0"
+  "chain_tail_hash": "6ce1d21aacde29d0391d93032d9b2904799aecf36e7672f32299c22426718dd4",
+  "audit_log_id": "88a29165-a999-4b1e-aaca-756303dcf885"
 }
 ```
 
 ### 4-2 清理后再查审计详情（近期留痕仍在）
 
-- 请求：`GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772`
+- 请求：`GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905`
 - 状态码：**200**（期望 200，OK）
 - 响应：
 
 ```json
 {
-  "id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
-  "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
+  "id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
+  "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
   "title": "E2E 虚构会话",
   "hidden_by_user": true,
-  "deleted_at": "2026-11-27T02:55:49.896479",
-  "created_at": "2026-11-27T02:55:49.755342",
+  "deleted_at": "2026-11-27T07:30:33.638584",
+  "created_at": "2026-11-27T07:30:33.555797",
   "trail_count": 10,
   "trails": [
     {
-      "id": "2487d725-4b1a-4cf2-9634-4f5dd18f41c9",
+      "id": "510f219e-7e89-40fd-8431-80c9fcfc46ad",
       "seq": 1,
       "kind": "message",
-      "occurred_at": "2026-11-27T02:55:49.772657",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.568302",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": true,
       "content": "帮我查会员 13812345678 的对接进度",
       "content_redacted": "帮我查会员 138****5678 的对接进度",
@@ -663,12 +663,12 @@
       "comment_redacted": null
     },
     {
-      "id": "b1b0389a-9b53-4b28-8225-550a693d7704",
+      "id": "44dbf861-b9e8-44b3-bdc4-3fa8670a527a",
       "seq": 2,
       "kind": "answer",
-      "occurred_at": "2026-11-27T02:55:49.796764",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.582994",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": true,
       "content": "按虚构制度 v3 第 4 条，该会员可对接。",
       "content_redacted": "按虚构制度 v3 第 4 条，该会员可对接。",
@@ -696,12 +696,12 @@
       "comment_redacted": null
     },
     {
-      "id": "ad762083-781a-4331-b3d0-88976bb4017d",
+      "id": "0a44274a-1d50-4f76-9115-3b445c580ad4",
       "seq": 3,
       "kind": "tool_call",
-      "occurred_at": "2026-11-27T02:55:49.812289",
-      "user_id": "24c2cf22-0bae-434a-9a66-6a67f5b2f186",
-      "conversation_id": "b850c430-1967-4f5c-a12b-ffd4902a6772",
+      "occurred_at": "2026-11-27T07:30:33.596847",
+      "user_id": "2e343238-5b4d-4c0f-acee-a651899d42ae",
+      "conversation_id": "d3372ee1-ae14-4bd4-a0f9-e80d28c52905",
       "hidden_by_user": true,
       "content": null,
       "content_redacted": null,
@@ -710,7 +710,7 @@
 ```
 
 
-**核对**：清理摘要 = {"org_id": "e4b9e0be-3bc0-4e7b-ae75-a6f1068781e6", "retention_days": 180, "cutoff": "2026-05-31T02:55:50.263206", "deleted_rows": 4, "deleted_chain_entries": 0, "batches": 1, "range_from": "2026-05-11T09:00:00", "range_to": "2026-05-11T09:03:00", "chain_tail_hash": "794e05e134edbeb627b505f81efd156305ce86d82ada6ff54d9f4270bcc8a5f6", "audit_log_id": "5f2a0d31-2ba8-4558-a9f2-bd1c27abc9f0"}
+**核对**：清理摘要 = {"org_id": "580728f5-9675-455b-bc40-55cbce52be18", "retention_days": 180, "cutoff": "2026-05-31T07:30:33.823034", "deleted_rows": 4, "deleted_chain_entries": 0, "batches": 1, "range_from": "2026-05-11T09:00:00", "range_to": "2026-05-11T09:03:00", "chain_tail_hash": "6ce1d21aacde29d0391d93032d9b2904799aecf36e7672f32299c22426718dd4", "audit_log_id": "88a29165-a999-4b1e-aaca-756303dcf885"}
 
 `audit_log` 里的删除摘要：
 
@@ -719,10 +719,10 @@
   {
     "count": 4,
     "retention_days": 180,
-    "cutoff": "2026-05-31T02:55:50.263206",
+    "cutoff": "2026-05-31T07:30:33.823034",
     "range_from": "2026-05-11T09:00:00",
     "range_to": "2026-05-11T09:03:00",
-    "chain_tail_hash": "794e05e134edbeb627b505f81efd156305ce86d82ada6ff54d9f4270bcc8a5f6",
+    "chain_tail_hash": "6ce1d21aacde29d0391d93032d9b2904799aecf36e7672f32299c22426718dd4",
     "chain_entries_deleted": 0,
     "batches": 1
   }
@@ -743,7 +743,7 @@
 
 ```json
 {
-  "job_id": "3081e60e-4a05-4a93-af89-32e1476f0905",
+  "job_id": "aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6",
   "status": "finished",
   "message": "导出任务已受理；用 GET /api/assistant/audit/exports/{job_id} 取下载链接（10 分钟有效）"
 }
@@ -751,25 +751,25 @@
 
 ### 5-2 GET 任务状态（finished + download_url）
 
-- 请求：`GET /api/assistant/audit/exports/3081e60e-4a05-4a93-af89-32e1476f0905`
+- 请求：`GET /api/assistant/audit/exports/aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6`
 - 状态码：**200**（期望 200，OK）
 - 响应：
 
 ```json
 {
-  "job_id": "3081e60e-4a05-4a93-af89-32e1476f0905",
+  "job_id": "aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6",
   "status": "finished",
   "format": "jsonl",
   "row_count": 10,
-  "file_sha256": "e4beaa401fe7c9964ac90a308bed8b28e30f989d4286b05bd785d7cdbc5c2daf",
-  "download_url": "http://127.0.0.1:53660/api/assistant/audit/exports/3081e60e-4a05-4a93-af89-32e1476f0905/download?token=3081e60e-4a05-4a93-af89-32e1476f0905.191b9c856b0c499fab3fb131ba4cbb77&sig=df6d9791ff852eb5a9f85a9b5fe215e280385decb904c1a1fb894dd2786dafac",
-  "expires_at": "2026-11-27T03:05:50.355658",
+  "file_sha256": "b99132b35df503e2bccc787cffaf8b1f1b09ae53f8e3441533e209816bd95977",
+  "download_url": "http://127.0.0.1:60480/api/assistant/audit/exports/aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6/download?token=aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6.6a30a7a0e2744312895debbd416d1f66&sig=dde85d8a1fa52706d7537ff3139bc89ac469c80a824480073db1a2057fece4f4",
+  "expires_at": "2026-11-27T07:40:33.861063",
   "error": null
 }
 ```
 
 
-**下载**：`GET /api/assistant/audit/exports/3081e60e-4a05-4a93-af89-32e1476f0905/download?token=3081e60e-4a05-4a93-af89-32e1476f0905.191b9c856b0c499fab3fb131ba4cbb77&sig=<redacted>` → **200**，共 11 行（1 行 manifest + 10 条留痕），首行类型 = `manifest`
+**下载**：`GET /api/assistant/audit/exports/aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6/download?token=aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6.6a30a7a0e2744312895debbd416d1f66&sig=<redacted>` → **200**，共 11 行（1 行 manifest + 10 条留痕），首行类型 = `manifest`
 
 **单次可用**：同一链接第二次下载 → **410**（期望 410）
 
@@ -783,47 +783,47 @@
 ## 服务端访问日志（uvicorn）
 
 ```
-INFO:     Started server process [33576]
+INFO:     Started server process [7980]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:53660 (Press CTRL+C to quit)
-INFO:     127.0.0.1:53671 - "GET /healthz HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /healthz HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/answers HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/tool-calls HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/blocked-events HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/feedback HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "DELETE /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772 HTTP/1.1" 204 No Content
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/ops/hash-chain/build HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "POST /api/assistant/ops/hash-chain/verify HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "POST /api/assistant/ops/hash-chain/verify HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations HTTP/1.1" 403 Forbidden
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772 HTTP/1.1" 403 Forbidden
-INFO:     127.0.0.1:58882 - "POST /api/assistant/audit/exports HTTP/1.1" 403 Forbidden
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations?page_size=10&tool_name=crm.member.lookup HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations?page_size=10&tool_name=crm.member.lookup HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations?page_size=10&tool_name=crm.member.lookup HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772 HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772/messages HTTP/1.1" 201 Created
-INFO:     127.0.0.1:58882 - "POST /api/assistant/ops/retention/purge HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/conversations/b850c430-1967-4f5c-a12b-ffd4902a6772 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "POST /api/assistant/audit/exports HTTP/1.1" 202 Accepted
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/exports/3081e60e-4a05-4a93-af89-32e1476f0905 HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/exports/3081e60e-4a05-4a93-af89-32e1476f0905/download?token=3081e60e-4a05-4a93-af89-32e1476f0905.191b9c856b0c499fab3fb131ba4cbb77&sig=df6d9791ff852eb5a9f85a9b5fe215e280385decb904c1a1fb894dd2786dafac HTTP/1.1" 200 OK
-INFO:     127.0.0.1:58882 - "GET /api/assistant/audit/exports/3081e60e-4a05-4a93-af89-32e1476f0905/download?token=3081e60e-4a05-4a93-af89-32e1476f0905.191b9c856b0c499fab3fb131ba4cbb77&sig=df6d9791ff852eb5a9f85a9b5fe215e280385decb904c1a1fb894dd2786dafac HTTP/1.1" 410 Gone
+INFO:     Uvicorn running on http://127.0.0.1:60480 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60485 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/answers HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/tool-calls HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/blocked-events HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/feedback HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "DELETE /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905 HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/ops/hash-chain/build HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "POST /api/assistant/ops/hash-chain/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "POST /api/assistant/ops/hash-chain/verify HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905 HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:60492 - "POST /api/assistant/audit/exports HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations?page_size=10&tool_name=crm.member.lookup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations?page_size=10&tool_name=crm.member.lookup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations?page_size=10&tool_name=crm.member.lookup HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905 HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:60492 - "POST /api/assistant/ops/retention/purge HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/conversations/d3372ee1-ae14-4bd4-a0f9-e80d28c52905 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "POST /api/assistant/audit/exports HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/exports/aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/exports/aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6/download?token=aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6.6a30a7a0e2744312895debbd416d1f66&sig=dde85d8a1fa52706d7537ff3139bc89ac469c80a824480073db1a2057fece4f4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60492 - "GET /api/assistant/audit/exports/aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6/download?token=aad9b1ac-eeb3-449b-8058-2a3eca5cd7f6.6a30a7a0e2744312895debbd416d1f66&sig=dde85d8a1fa52706d7537ff3139bc89ac469c80a824480073db1a2057fece4f4 HTTP/1.1" 410 Gone
 ```
 

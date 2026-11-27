@@ -10,7 +10,7 @@ import uuid
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.db.base import utcnow
 from app.services.audit_log import ACTION_EXPORT_DOWNLOAD, query_audit_log
@@ -209,6 +209,7 @@ def test_jsonl_has_row_hash_after_chain_build(ctx):
     """提案 ⑤：JSONL 每行含 row_hash，可离线逐行复核（未建链时为 null）。"""
     from datetime import date
 
+    from app.models.asst_hash_chain import AsstHashChainEntry
     from app.services.hash_chain import build_chain
     from tests.conftest import ORG_ID
 
@@ -233,10 +234,11 @@ def test_jsonl_has_row_hash_after_chain_build(ctx):
 
     with ctx.session() as session:
         rows = session.execute(
-            text("SELECT trail_id, row_hash FROM asst_hash_chain WHERE org_id = :org"),
-            {"org": ORG_ID.hex},
+            select(AsstHashChainEntry.trail_id, AsstHashChainEntry.row_hash).where(
+                AsstHashChainEntry.org_id == ORG_ID
+            )
         ).all()
-    # SQLite 里 UUID 以 32 位 hex 存储，比对前统一成带连字符的规范形式
+    # SQLite 存 32 位 hex、PostgreSQL 返回 uuid 对象：比对前统一成带连字符的规范形式
     by_trail = {str(uuid.UUID(str(trail_id))): row_hash for trail_id, row_hash in rows}
     assert len(by_trail) == len(records)
     for record in records:

@@ -5,8 +5,9 @@
       GET /audit/exports/{job_id} → status / row_count / download_url；
       download_url 带 HMAC 签名，10 分钟有效、单次可用（重复使用返回 410）。
 
-队列：ASST_EXPORT_QUEUE=inline（测试同步跑）/ thread（进程内线程）。
-真实环境换成 Redis 队列（requirements 里的 redis 即为这条链路预留），接口不变。
+队列：ASST_EXPORT_QUEUE=inline（测试同步跑）/ thread（进程内线程）/ redis（跨进程）。
+redis 模式下 API 只入队（app/services/export_queue.py 的 LPUSH），由独立进程
+python -m app.workers.export_worker 用 BRPOP 取任务执行，状态写回 asst_export_job。
 """
 from __future__ import annotations
 
@@ -225,9 +226,16 @@ def resolve_download(
 def enqueue_export(
     *, session: Session, job_id: uuid.UUID, cipher: TrailCipher, settings: Settings
 ) -> None:
-    """按 ASST_EXPORT_QUEUE 决定同步执行还是丢到进程内线程。"""
+    """按 ASST_EXPORT_QUEUE 决定：同步执行 / 进程内线程 / 推 Redis 队列。"""
     if settings.export_queue == "inline":
         run_export_job(session, job_id=job_id, cipher=cipher, settings=settings)
+        return
+
+    if settings.export_queue == "redis":
+        # 只入队：任务由独立 worker 进程消费，API 不阻塞、进程挂了任务还在
+        from app.services import export_queue
+
+        export_queue.enqueue(settings, job_id)
         return
 
     def _worker() -> None:

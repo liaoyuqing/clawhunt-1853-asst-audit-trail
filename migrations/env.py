@@ -14,7 +14,12 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", load_settings().sqlalchemy_url)
+# configparser 会把 % 当插值符：连接串里出现百分号转义（例如口令中的 # 写成 %23、
+# 或 query 里带 options=...%20search_path...）时，必须先转义成 %% 再写入。
+# 读取侧（get_section）会还原成原值，所以最终连到的仍是同一条串。
+config.set_main_option(
+    "sqlalchemy.url", load_settings().sqlalchemy_url.replace("%", "%%")
+)
 target_metadata = Base.metadata
 
 

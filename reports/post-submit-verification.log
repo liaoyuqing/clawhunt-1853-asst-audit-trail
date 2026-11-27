@@ -1,0 +1,13 @@
+﻿# 提交后复核：提交的正是这个 sha
+# repo: https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail
+# commit: 94ee623f728968724e7bdeed8f3677e167467e8c (main, = the commit delivery_check read)
+# source: codeload tarball of that exact sha (git protocol to github.com is reset by the sandbox network)
+# command: python -m pytest
+# generated: 2026-11-27T12:00:23
+
+........................................................................ [100%]
+72 passed in 18.63s
+
+[EXIT=0]
+[files=63] [py_files=45] [secret_scan_hits=0]
+

@@ -4,7 +4,7 @@ Revision ID: 0001_initial
 Revises:
 Create Date: 2026-11-27
 
-注意：本迁移在 PostgreSQL 16 上是权威建表路径（含 plpgsql 触发器）；
+注意：本迁移在 PostgreSQL 15+ 上是权威建表路径（含 plpgsql 触发器）；
 SQLite 分支用于本地与测试（列清单版触发器）。两套触发器与 app/db/immutability.py 一致。
 """
 from __future__ import annotations
@@ -234,7 +234,7 @@ def upgrade() -> None:
 
 
 def _install_triggers() -> None:
-    """装只增不改触发器（PG16 用 plpgsql，SQLite 用列清单版）。"""
+    """装只增不改触发器（PostgreSQL 用 plpgsql，SQLite 用列清单版）。"""
     bind = op.get_bind()
     bind.exec_driver_sql(_PURGE_GUARD_DDL)
     bind.exec_driver_sql(

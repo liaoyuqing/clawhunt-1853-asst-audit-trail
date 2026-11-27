@@ -1,0 +1,106 @@
+# Redis 导出队列真机端到端取证
+
+- 日期：2026-11-27T15:04:06+0800
+- 数据库：真实 PostgreSQL（临时 schema asst_e2e_811baf0f31）
+- 队列：真实 Redis（ASST_EXPORT_QUEUE=redis，键前缀 asst1853:e2e-35c59b62:）
+- worker：独立进程 python -m app.workers.export_worker --max-jobs 1 --once
+
+## 1. Redis 连通性
+
+PING -> True
+redis_version = 7.2.14
+LLEN asst1853:e2e-35c59b62:export:queue (before) = 0
+
+## 2. alembic upgrade head
+
+
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001_initial, 初始结构：留痕、链、清理标记、导出任务、审计日志 + 只增不改触发器。
+
+exit code = 0
+
+## 3. 以 ASST_EXPORT_QUEUE=redis 启动 API
+
+GET /healthz -> 200
+
+## 4. 通过真实 API 造 5 条留痕
+
+- conversation_id = 20a0b950-d380-4a95-b2e3-4ee2dc4ad2da
+- 5 x POST /api/assistant/conversations/{id}/messages -> 201
+
+## 5. POST /api/assistant/audit/exports（API 只入队）
+
+{
+  "job_id": "496b3cc6-5841-4b9b-aadd-8064aefdf40c",
+  "status": "queued",
+  "message": "导出任务已受理；用 GET /api/assistant/audit/exports/{job_id} 取下载链接（10 分钟有效）"
+}
+- HTTP 202（期望 202），status = queued
+- worker 未跑时磁盘上的文件：[]（期望 []）
+- LLEN asst1853:e2e-35c59b62:export:queue = 1
+- LRANGE queue = ["496b3cc6-5841-4b9b-aadd-8064aefdf40c"]
+
+## 6. worker 独立进程消费队列
+
+$ python -m app.workers.export_worker --max-jobs 1 --once
+
+2026-11-27 15:04:18,781 INFO export job 496b3cc6-5841-4b9b-aadd-8064aefdf40c finished, rows=5
+2026-11-27 15:04:18,781 INFO handled job 496b3cc6-5841-4b9b-aadd-8064aefdf40c (status=finished)
+2026-11-27 15:04:19,032 INFO export worker exit, handled=1
+
+exit code = 0
+
+- LLEN queue after worker = 0（期望 0）
+- processing 列表 after worker = []（期望 []）
+
+## 7. 任务状态与生成文件
+
+{
+  "job_id": "496b3cc6-5841-4b9b-aadd-8064aefdf40c",
+  "status": "finished",
+  "format": "jsonl",
+  "row_count": 5,
+  "file_sha256": "179d3448bb98a6b223bfa19750a8adc29870ee4ddad54edfe41e8b5751192243",
+  "download_url": "http://127.0.0.1:59120/api/assistant/audit/exports/496b3cc6-5841-4b9b-aadd-8064aefdf40c/download?token=496b3cc6-5841-4b9b-aadd-8064aefdf40c.5b5d473bfd20472892424bf078f60ef2&sig=350d339f21ca0e39618f8c2ffd5e76a14ba883c28f311f21a36205bb4c3237df",
+  "expires_at": "2026-11-27T07:14:19.306332",
+  "error": null
+}
+- worker 跑完后的文件：["asst-audit-496b3cc6-5841-4b9b-aadd-8064aefdf40c.jsonl"]
+- 文件行数 = 6（1 行 manifest + 5 条留痕）
+
+## 8. 下载导出文件（签名链接单次可用）
+
+- GET download_url -> HTTP 200（期望 200）
+- bytes = 4887
+- 同一链接再取一次 -> HTTP 410（期望 410）
+
+## 9. 结论
+
+- API 只入队：PASS
+- worker 真消费 + 真落文件 + 状态 finished：PASS
+- 签名下载单次可用：PASS
+
+## 10. 服务端访问日志（uvicorn，末 40 行）
+
+INFO:     Started server process [36084]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:59120 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56375 - "GET /healthz HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56381 - "POST /api/assistant/conversations HTTP/1.1" 201 Created
+INFO:     127.0.0.1:56381 - "POST /api/assistant/conversations/20a0b950-d380-4a95-b2e3-4ee2dc4ad2da/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:56381 - "POST /api/assistant/conversations/20a0b950-d380-4a95-b2e3-4ee2dc4ad2da/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:56381 - "POST /api/assistant/conversations/20a0b950-d380-4a95-b2e3-4ee2dc4ad2da/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:56381 - "POST /api/assistant/conversations/20a0b950-d380-4a95-b2e3-4ee2dc4ad2da/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:56381 - "POST /api/assistant/conversations/20a0b950-d380-4a95-b2e3-4ee2dc4ad2da/messages HTTP/1.1" 201 Created
+INFO:     127.0.0.1:56381 - "POST /api/assistant/audit/exports HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:56381 - "GET /api/assistant/audit/exports/496b3cc6-5841-4b9b-aadd-8064aefdf40c HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56381 - "GET /api/assistant/audit/exports/496b3cc6-5841-4b9b-aadd-8064aefdf40c/download?token=496b3cc6-5841-4b9b-aadd-8064aefdf40c.5b5d473bfd20472892424bf078f60ef2&sig=350d339f21ca0e39618f8c2ffd5e76a14ba883c28f311f21a36205bb4c3237df HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56381 - "GET /api/assistant/audit/exports/496b3cc6-5841-4b9b-aadd-8064aefdf40c/download?token=496b3cc6-5841-4b9b-aadd-8064aefdf40c.5b5d473bfd20472892424bf078f60ef2&sig=350d339f21ca0e39618f8c2ffd5e76a14ba883c28f311f21a36205bb4c3237df HTTP/1.1" 410 Gone
+
+## 11. 清理
+
+- 前缀 asst1853:e2e-35c59b62: 下残留 key = []
+- schema asst_e2e_811baf0f31 已 DROP，残留 = 0
+
