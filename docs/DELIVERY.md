@@ -78,11 +78,11 @@ S2-AUDIT / S2-IAM 是桩：审计日志落本地 `audit_log` 表（同样装了�
 
 提交的 assets 均为可在浏览器直接打开的 https 直链：
 
-| kind | 打开后应看到 |
-| --- | --- |
-| `github_repo` | 仓库首页，63 个受版本控制文件 |
-| `report` | `reports/e2e-evidence.md`：进程级端到端 4 条 AC 与导出链路的逐请求记录（714 行） |
-| `report` | `reports/pytest-full.log`：72 passed in 16.93s 的完整 pytest 输出 |
-| `doc` | `README.md`：运行方式、环境变量、S2-AUDIT/S2-IAM 对接点、验证边界 |
+| kind | URL | 打开后应看到 |
+| --- | --- | --- |
+| `github_repo` | https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail | 仓库首页，63 个受版本控制文件 |
+| `report` | https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail/blob/main/reports/e2e-evidence.md | 进程级端到端 4 条 AC 与导出链路的逐请求记录（714 行） |
+| `report` | https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail/blob/main/reports/pytest-full.log | 72 passed in 16.93s 的完整 pytest 输出 |
+| `doc` | https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail/blob/main/README.md | 运行方式、环境变量、S2-AUDIT/S2-IAM 对接点、验证边界 |
 
 平台没有通用文件上传口，因此全部交付物既在仓库里逐文件可读，也把关键结论写进了本正文。
