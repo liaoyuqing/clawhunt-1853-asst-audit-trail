@@ -79,7 +79,7 @@
 | 端到端（复跑） | `python scripts/e2e_evidence.py` | `EXIT=0`（`reports/e2e-evidence.md`） |
 | 推送后逐字节核对 | codeload 取 `ce876ad3` 全树 vs 工作区 | 77/77 文件 sha256 全一致，missing/extra/diff 均为空 |
 | 推送树 pytest（最终） | 匿名 codeload 取「HEAD 所在提交」的整棵树（无本地改动）跑 `python -m pytest -v` | **72 passed, 13 skipped**，EXIT 0（`reports/post-push-verification.log`） |
-| 密钥扫描（真机凭据） | 扫真实 PG 口令（原始 + URL 编码）、Redis 口令、主机 IP、账号 DSN 形态、平台 Bearer | **命中 0**（工作区 144 文件 / 推送树 118 文件） |
+| 密钥扫描（真机凭据） | 扫真实 PG 口令（原始 + URL 编码）、Redis 口令、主机 IP、账号 DSN 形态、平台 Bearer | **命中 0**（工作区 144 文件 / 推送树 78 文件） |
 
 ## 5. 与提案的对齐
 
