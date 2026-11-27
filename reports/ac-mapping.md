@@ -1,7 +1,7 @@
 # 验收标准对照表（AC ↔ 用例 ↔ 证据）
 
 全部数据由 `python -m pytest -v` 真实产生，原始日志见同目录 `pytest-*.log`。
-汇总：**70 passed in 27.60s**（`pytest-full.log` 末行）。
+汇总：**72 passed**（真实运行结果见 `pytest-full.log` 末行）。
 
 本次运行环境：Windows / Python 3.11.9 / pytest 9.2.0 / SQLite（临时文件库）；无 Docker、无 PostgreSQL 实例，
 因此未跑真实 PG16 —— 差异与补救见 README 第 8 节「验证边界」。
@@ -20,8 +20,9 @@
 | `test_hidden_flag_only_whitelist` | 白名单列 `hidden_by_user=1` 可改；`hidden_by_user=7`（非布尔）被拒 | 同上 |
 | `test_audit_list_shows_hidden_conversation` | 列表接口也能查到已隐藏会话 | 同上 |
 | `test_unknown_conversation_404` | 不存在的会话 → 404 | 同上 |
+| `test_tool_call_keeps_result_digest` | 工具调用留痕含提案 ⑤ 的 `result_digest`（结果摘要 sha256）：`params_redacted.phone=138****5678`、`result_summary` 不含原号、`confirmed_by/confirmed_at/status` 齐全 | 同上 |
 
-AC1 对应文件：`app/services/conversations.py`（`hide_conversation` 只写 `hidden_by_user`）、`app/api/audit.py`（详情解密）、`app/db/immutability.py`（触发器）。
+AC1 对应文件：`app/services/conversations.py`（`hide_conversation` 只写 `hidden_by_user`）、`app/api/assistant/audit.py`（详情解密）、`app/db/immutability.py`（触发器）。
 
 ---
 
@@ -66,7 +67,7 @@ AC2 对应文件：`app/services/hash_chain.py`（`build_chain` / `verify_chain`
 | `test_pagination` | 3 条 / 页 2 → 2 页、无重复 | 同上 |
 | `test_invalid_time_window_400` | `from > to` → 400 `INVALID_TIME_WINDOW` | 同上 |
 
-AC3 对应文件：`app/api/deps.py`（`require_auditor`）、`app/services/iam.py`、`app/services/audit_log.py`、`app/api/audit.py`。
+AC3 对应文件：`app/api/deps.py`（`require_auditor`）、`app/services/iam.py`、`app/services/audit_log.py`、`app/api/assistant/audit.py`。
 
 ---
 
@@ -103,4 +104,5 @@ AC4 对应文件：`app/services/retention.py`、`app/db/immutability.py`（清�
 | 文件指纹 | `test_export_file_has_sha256` | 同上 |
 | 下载写审计 | `test_download_writes_audit_record` | 同上 |
 | 跨 org 隔离 / 文件独立 | `test_export_job_isolated_per_org`、`test_exports_are_separate_files` | 同上 |
+| JSONL 每行含 `row_hash` | `test_jsonl_has_row_hash_after_chain_build`（建链后每行 `row_hash` 为 64 位且与 `asst_hash_chain` 逐条一致；manifest 有 `row_hash_note`） | 同上 |
 | 加密与脱敏口径 | `pytest tests/test_crypto_redaction.py`（13 条） | `pytest-crypto-redaction.log` |

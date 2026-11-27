@@ -95,6 +95,7 @@ class TrailItem(BaseModel):
     tool_version: str | None = None
     params_redacted: dict[str, Any] | None = None
     result_summary: str | None = None
+    result_digest: str | None = None
     confirmed_by: str | None = None
     confirmed_at: str | None = None
     status: str | None = None
@@ -290,6 +291,7 @@ def get_audit_conversation(
                 tool_version=trail.tool_version,
                 params_redacted=trail.params_redacted,
                 result_summary=trail.result_summary,
+        result_digest=trail.result_digest,
                 confirmed_by=str(trail.confirmed_by) if trail.confirmed_by else None,
                 confirmed_at=trail.confirmed_at.isoformat() if trail.confirmed_at else None,
                 status=trail.status,

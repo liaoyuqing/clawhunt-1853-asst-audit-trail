@@ -1,0 +1,23 @@
+﻿# clean clone: git clone --depth 1 https://github.com/liaoyuqing/clawhunt-1853-asst-audit-trail.git
+# HEAD: 37f4f99571ec6ec7d9a401badedcf458b55af316
+# generated: 2026-11-27T10:41:43
+
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.2.0, pluggy-1.7.0
+rootdir: E:\AI接单\Clawhunt-2\delivery\work\1853\clean
+configfile: pytest.ini
+testpaths: tests
+plugins: anyio-4.15.1, hydra-core-1.3.2, typeguard-4.5.2
+collected 70 items
+
+tests\test_audit_rbac.py ..............                                  [ 20%]
+tests\test_crypto_redaction.py .............                             [ 38%]
+tests\test_export.py ...........                                         [ 54%]
+tests\test_hash_chain.py .............                                   [ 72%]
+tests\test_retention_purge.py ...........                                [ 88%]
+tests\test_trail_immutable.py ........                                   [100%]
+
+============================= 70 passed in 29.64s =============================
+
+[EXIT=0]
+

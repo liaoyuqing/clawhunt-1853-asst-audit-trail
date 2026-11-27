@@ -1,15 +1,15 @@
 # command: python -m pytest -v tests/test_trail_immutable.py
 # cwd: E:\AI接单\Clawhunt-2\delivery\work\1853
 # exit code: 0
-# generated: 2026-11-27T10:33:48
+# generated: 2026-11-27T10:54:43
 
 ============================= test session starts =============================
 platform win32 -- Python 3.11.9, pytest-9.2.0, pluggy-1.7.0
 rootdir: E:\AI接单\Clawhunt-2\delivery\work\1853
 configfile: pytest.ini
-plugins: anyio-4.15.1, hydra-core-1.3.2, typeguard-4.5.2
-collected 8 items
+plugins: cov-7.1.0, anyio-4.15.1, hydra-core-1.3.2, typeguard-4.5.2
+collected 9 items
 
-tests\test_trail_immutable.py ........                                   [100%]
+tests\test_trail_immutable.py .........                                  [100%]
 
-============================== 8 passed in 2.66s ==============================
+============================== 9 passed in 2.41s ==============================

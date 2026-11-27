@@ -162,3 +162,28 @@ def test_unknown_conversation_404(ctx):
         f"/api/assistant/audit/conversations/{uuid.uuid4()}", headers=auth(AUDITOR_TOKEN)
     )
     assert response.status_code == 404
+
+def test_tool_call_keeps_result_digest(ctx):
+    """提案 ⑤ 字段清单：工具调用留痕含 result_digest（结果摘要的 sha256，可离线核对）。"""
+    from tests.conftest import post_tool_call
+
+    conversation_id = create_conversation(ctx, title="工具调用字段")
+    post_tool_call(ctx, conversation_id, tool_name="crm.member.lookup")
+    response = ctx.client.get(
+        f"/api/assistant/audit/conversations/{conversation_id}", headers=auth(AUDITOR_TOKEN)
+    )
+    assert response.status_code == 200, response.text
+    tool = [t for t in response.json()["trails"] if t["kind"] == "tool_call"][0]
+    assert tool["tool_name"] == "crm.member.lookup"
+    assert tool["tool_version"] == "1.4.2"
+    assert tool["params_redacted"]["phone"] == "138****5678"
+    assert "13812345678" not in tool["result_summary"]
+    expected = hashlib.sha256(
+        "命中 1 条虚构会员记录，联系人 13812345678".encode("utf-8")
+    ).hexdigest()
+    assert tool["result_digest"] == expected
+    from tests.conftest import CONFIRMER_ID
+
+    assert tool["confirmed_by"] == str(CONFIRMER_ID)
+    assert tool["confirmed_at"] is not None
+    assert tool["status"] == "ok"

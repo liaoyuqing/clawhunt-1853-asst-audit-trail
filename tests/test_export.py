@@ -204,3 +204,40 @@ def test_exports_are_separate_files(ctx):
     assert len(files) == 2
     assert any(first in name for name in files)
     assert any(second in name for name in files)
+
+def test_jsonl_has_row_hash_after_chain_build(ctx):
+    """提案 ⑤：JSONL 每行含 row_hash，可离线逐行复核（未建链时为 null）。"""
+    from datetime import date
+
+    from app.services.hash_chain import build_chain
+    from tests.conftest import ORG_ID
+
+    seed_full_conversation(ctx)
+    with ctx.session() as session:
+        build_chain(session, org_id=ORG_ID, chain_date=date.today())
+        session.commit()
+
+    job_id = _create_export(ctx)
+    url = ctx.client.get(
+        f"/api/assistant/audit/exports/{job_id}", headers=auth(AUDITOR_TOKEN)
+    ).json()["download_url"]
+    response = ctx.client.get(url.split("http://testserver", 1)[1])
+    assert response.status_code == 200
+    lines = [line for line in response.text.splitlines() if line.strip()]
+    manifest = json.loads(lines[0])
+    assert "row_hash_note" in manifest
+    records = [json.loads(line) for line in lines[1:]]
+    assert all(record["row_hash"] for record in records)
+    assert all(len(record["row_hash"]) == 64 for record in records)
+    assert len({record["row_hash"] for record in records}) == len(records)
+
+    with ctx.session() as session:
+        rows = session.execute(
+            text("SELECT trail_id, row_hash FROM asst_hash_chain WHERE org_id = :org"),
+            {"org": ORG_ID.hex},
+        ).all()
+    # SQLite 里 UUID 以 32 位 hex 存储，比对前统一成带连字符的规范形式
+    by_trail = {str(uuid.UUID(str(trail_id))): row_hash for trail_id, row_hash in rows}
+    assert len(by_trail) == len(records)
+    for record in records:
+        assert by_trail[record["trail_id"]] == record["row_hash"]

@@ -122,6 +122,8 @@ class TrailWriter:
         """工具调用：参数先脱敏再落库（payload 与展示列都用脱敏值）。"""
         params_redacted = redact_value(dict(params))
         summary_redacted = redact_text(result_summary)
+        # 结果摘要可能被脱敏截断，另存原始结果的 sha256 供离线核对
+        digest = sha256_hex(result_summary.encode("utf-8"))
         return self._append(
             conversation=conversation,
             user_id=user_id,
@@ -131,6 +133,7 @@ class TrailWriter:
             tool_version=tool_version,
             params_redacted=params_redacted,
             result_summary=summary_redacted,
+            result_digest=digest,
             confirmed_by=confirmed_by,
             confirmed_at=confirmed_at,
             status=status,
@@ -139,6 +142,7 @@ class TrailWriter:
                 "tool_name": tool_name,
                 "tool_version": tool_version,
                 "params_redacted": params_redacted,
+                "result_digest": digest,
                 "result_summary": summary_redacted,
                 "status": status,
                 "confirmed_by": confirmed_by,

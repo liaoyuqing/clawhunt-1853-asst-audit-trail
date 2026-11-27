@@ -27,6 +27,7 @@ from app.core.canonical import canonical_json
 from app.services.crypto import DecryptionError, TrailCipher, derive_signing_key, sha256_hex
 from app.db.base import utcnow
 from app.models.asst_export_job import AsstExportJob, AsstExportToken
+from app.models.asst_hash_chain import AsstHashChainEntry
 from app.services.query import TrailFilter, query_trails
 from app.services.trail_writer import trail_aad
 
@@ -108,6 +109,13 @@ def run_export_job(
         session, org_id=job.org_id, filters=filters, limit=settings.export_max_rows
     )
     target = export_dir(settings) / f"asst-audit-{job.id}.{EXPORT_FORMAT}"
+    # 已建链的留痕带上 row_hash，供离线逐行复核；尚未建链的写 null（manifest 里说明）
+    chain_rows = session.execute(
+        select(AsstHashChainEntry.trail_id, AsstHashChainEntry.row_hash).where(
+            AsstHashChainEntry.org_id == job.org_id
+        )
+    ).all()
+    chain_hashes = {str(trail_id): row_hash for trail_id, row_hash in chain_rows}
 
     digest = hashlib.sha256()
     written = 0
@@ -120,6 +128,7 @@ def run_export_job(
             "filters": job.filters,
             "generated_at": utcnow().isoformat(timespec="seconds") + "Z",
             "schema": 1,
+            "row_hash_note": "row_hash 为留痕已建哈希链时的链上值；尚未建链的行为 null",
         }
         line = canonical_json(header)
         handle.write(line + "\n")
@@ -142,7 +151,9 @@ def run_export_job(
                 "content": content,
                 "content_redacted": trail.content_redacted,
                 "content_sha256": trail.content_sha256,
+                "result_digest": trail.result_digest,
                 "payload": trail.payload,
+                "row_hash": chain_hashes.get(str(trail.id)),
             }
             line = canonical_json(record)
             handle.write(line + "\n")

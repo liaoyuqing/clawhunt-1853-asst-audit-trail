@@ -74,6 +74,7 @@ def upgrade() -> None:
         sa.Column("tool_version", sa.String(64), nullable=True),
         sa.Column("params_redacted", sa.JSON(), nullable=True),
         sa.Column("result_summary", sa.Text(), nullable=True),
+        sa.Column("result_digest", sa.String(length=64), nullable=True),
         sa.Column("confirmed_by", sa.Uuid(), nullable=True),
         sa.Column("confirmed_at", sa.DateTime(), nullable=True),
         sa.Column("status", sa.String(32), nullable=True),

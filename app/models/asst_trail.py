@@ -70,6 +70,8 @@ class AsstTrail(UUIDPrimaryKeyMixin, BusinessColumnsMixin, Base):
     tool_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     params_redacted: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     result_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 工具调用结果的指纹：结果本身可能很长或被脱敏，另存 sha256 供离线核对
+    result_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
     confirmed_by: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
     status: Mapped[str | None] = mapped_column(String(32), nullable=True)

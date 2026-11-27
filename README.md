@@ -37,7 +37,7 @@ python -m uvicorn app.main:app --reload --port 8000
 ### 跑测试
 
 ```bash
-python -m pytest -q                 # 全量：70 passed
+python -m pytest -q                 # 全量：72 passed
 python -m pytest tests/test_trail_immutable.py -v   # AC1
 python -m pytest tests/test_hash_chain.py -v        # AC2
 python -m pytest tests/test_audit_rbac.py -v        # AC3
@@ -64,7 +64,7 @@ python -m pytest tests/test_retention_purge.py -v   # AC4
 | 异步导出 + 10 分钟链接 | `app/services/export.py`（JSONL、HMAC 签名、单次可用） |
 | 审计日志（S2-AUDIT 桩） | `app/services/audit_log.py` + `audit_log` 表（同样装了只增不改触发器） |
 | 身份与角色（S2-IAM 桩） | `app/services/iam.py` + `app/api/deps.py::require_auditor` |
-| 测试 | `tests/`（6 个测试文件，70 条用例） |
+| 测试 | `tests/`（6 个测试文件，72 条用例） |
 
 ---
 
@@ -256,7 +256,7 @@ row_hash = sha256(prev_hash || canonical_json(payload))
 
 ## 8. 验证边界（如实说明：哪些在本机跑不了、用什么替代）
 
-本仓库的自动化测试全部在 **SQLite** 上跑通（70 条），**没有在本机连上真实 PostgreSQL 16**（本机无 PG 实例、无 Docker）。因此下面这些差异必须在集成环境复核：
+本仓库的自动化测试全部在 **SQLite** 上跑通（72 条），**没有在本机连上真实 PostgreSQL 16**（本机无 PG 实例、无 Docker）。因此下面这些差异必须在集成环境复核：
 
 | 项 | 测试用的 SQLite | 生产 PG16 | 影响与补救 |
 | --- | --- | --- | --- |
@@ -311,7 +311,7 @@ app/
   workers/verify_chain.py         链校验任务（断点则退出码 2）
   workers/retention_purge.py      保留期清理任务
 migrations/                       Alembic 迁移（0001_initial）
-tests/                            6 个测试文件 / 70 条用例
+tests/                            6 个测试文件 / 72 条用例
 reports/                          pytest 原始输出与 AC 对照表
 ```
 
