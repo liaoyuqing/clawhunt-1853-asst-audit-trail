@@ -1,0 +1,30 @@
+POST-PUSH VERIFICATION
+
+Tree under test: the published GitHub tree of branch main at the commit that contains
+this report (see `git log -1` in the repository; the sha is intentionally not pinned
+here so the report cannot go stale when this very file is committed).
+It was fetched anonymously from codeload with no credentials, extracted into a clean
+directory, and run with no local edits.
+
+Provenance vs the code commit ce876ad359c1593bf05afe23febd5958551889cf:
+the two trees differ only in HANDOFF.md and this report; every source, test, migration,
+script and docs/DELIVERY.md file is byte-identical (sha256 compared file by file).
+
+Tree size: 78 files (50 Python, 8 test modules, 18 reports).
+
+Command: python -m pytest -v
+Environment: no middleware variables set (offline baseline: temp SQLite, inline queue)
+Exit code: 0
+Summary: 72 passed, 13 skipped
+
+The 13 skips are the middleware-specific cases that need real infrastructure:
+10 in tests/test_pg_dialect.py (needs ASST_TEST_DATABASE_URL) and 3 in
+tests/test_redis_queue.py (needs ASST_TEST_REDIS_URL). They are exercised separately:
+see reports/pytest-pg.log (82 passed, 3 skipped against real PostgreSQL) and
+reports/pytest-redis.log (3 passed against real Redis).
+
+Reproduce:
+  curl -L https://codeload.github.com/liaoyuqing/clawhunt-1853-asst-audit-trail/tar.gz/main | tar xz
+  cd clawhunt-1853-asst-audit-trail-main
+  pip install -r requirements.txt
+  python -m pytest -v
